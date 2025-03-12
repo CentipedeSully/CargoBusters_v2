@@ -13,6 +13,7 @@ public class Footstepper : MonoBehaviour
     [SerializeField] private FloorType _currentFloorType = FloorType.unset;
     [SerializeField] private FootstepData _footstepData;
     private AudioSource _footAudioSource;
+    [SerializeField] private bool _footstepsEnabled = true;
 
 
 
@@ -24,9 +25,23 @@ public class Footstepper : MonoBehaviour
         SetFloorType(FloorType.general);
     }
 
+    private void OnEnable()
+    {
+        _firstPersonController.OnJump += TriggerJumpSideEffects;
+        _firstPersonController.OnLand += TriggerLandingSideEffects;
+        _firstPersonController.OnUngrounded += HaltFootstepTracking;
+    }
+
+    private void OnDisable()
+    {
+        _firstPersonController.OnJump -= TriggerJumpSideEffects;
+        _firstPersonController.OnLand -= TriggerLandingSideEffects;
+        _firstPersonController.OnUngrounded -= HaltFootstepTracking;
+    }
+
     private void Update()
     {
-        if (_firstPersonController != null)
+        if (_firstPersonController != null && _footstepsEnabled)
             IncrementTick(_firstPersonController.GetSpeed() * Time.deltaTime);
     }
 
@@ -68,6 +83,36 @@ public class Footstepper : MonoBehaviour
         _currentTickProgress = 0;
     }
 
+
+    private void HaltFootstepTracking()
+    {
+        _footstepsEnabled = false;
+        ResetTick();
+    }
+
+
+    private void TriggerJumpSideEffects()
+    {
+        //halt the footstep tracker
+        HaltFootstepTracking();
+
+        //play the jump sound
+        SetFootSound(FootSoundType.jump);
+        PlayFootSound();
+
+    }
+
+    private void TriggerLandingSideEffects()
+    {
+        //play the land sound
+        SetFootSound(FootSoundType.land);
+        PlayFootSound();
+
+
+        //resume the footstep tracker
+        _footstepsEnabled = true;
+
+    }
 
 
     //externals

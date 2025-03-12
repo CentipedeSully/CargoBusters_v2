@@ -42,6 +42,11 @@ namespace StarterAssets
 		public float GroundedRadius = 0.5f;
 		[Tooltip("What layers the character uses as ground")]
 		public LayerMask GroundLayers;
+		[Tooltip("The minimal time to wait before triggering interal 'left the ground' states. " +
+			"Used to prevent tiny vertical displacements from triggering unexpected behavior")]
+		[SerializeField] private float _ungroundedBufferTime = 0.1f;
+		private float _currentUngroundedBufferCount = 0;
+		private bool _ungroundedBufferReached = false;
 
 		[Header("Cinemachine")]
 		[Tooltip("The follow target set in the Cinemachine Virtual Camera that the camera will follow")]
@@ -73,6 +78,15 @@ namespace StarterAssets
 		private GameObject _mainCamera;
 
 		private const float _threshold = 0.01f;
+
+
+		public delegate void MovementEvent();
+		public event MovementEvent OnJump;
+		public event MovementEvent OnLand;
+		public event MovementEvent OnUngrounded;
+
+
+
 
 		private bool IsCurrentDeviceMouse
 		{
@@ -211,11 +225,28 @@ namespace StarterAssets
 					_verticalVelocity = -2f;
 				}
 
+
+				// the buffer timer is used to help verify instances when the player has left the ground
+				// for a minimal duration. If the buffer is reset when the player touches the ground.
+				// If the buffer is reached, meaning the player has been ungrounded for a sufficient duration,
+				// then the 'OnLand' movement event is called the next time the player touches the ground
+				if (_ungroundedBufferReached)
+				{
+					OnLand?.Invoke();
+				}
+
+				// reset the ungrounded buffer's states
+				_ungroundedBufferReached = false;
+				_currentUngroundedBufferCount = 0;
+
 				// Jump
 				if (_input.jump && _jumpTimeoutDelta <= 0.0f)
 				{
 					// the square root of H * -2 * G = how much velocity needed to reach desired height
 					_verticalVelocity = Mathf.Sqrt(JumpHeight * -2f * Gravity);
+
+					//signal the jump
+					OnJump?.Invoke();
 				}
 
 				// jump timeout
@@ -237,6 +268,20 @@ namespace StarterAssets
 
 				// if we are not grounded, do not jump
 				_input.jump = false;
+
+				// tick the ungrounded buffer. Used to for filtering out studder-grounding
+				if (!_ungroundedBufferReached)
+				{
+					_currentUngroundedBufferCount += Time.deltaTime;
+
+					if (_currentUngroundedBufferCount > _ungroundedBufferTime)
+					{
+						_ungroundedBufferReached = true;
+
+						//raise the ungrounded event
+						OnUngrounded?.Invoke();
+					}
+				}
 			}
 
 			// apply gravity over time if under terminal (multiply by delta time twice to linearly speed up over time)
