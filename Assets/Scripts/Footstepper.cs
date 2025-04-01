@@ -72,10 +72,7 @@ public class Footstepper : MonoBehaviour
     private void PlayFootSound()
     {
         if (_footAudioSource != null)
-        {
-            if (_footAudioSource.isPlaying == false)
-                _footAudioSource.Play();
-        }
+            _footAudioSource.Play();
     }
 
     private void ResetTick()

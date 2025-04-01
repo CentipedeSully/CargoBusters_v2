@@ -16,6 +16,7 @@ namespace StarterAssets
 		public float MoveSpeed = 4.0f;
 		[Tooltip("Sprint speed of the character in m/s")]
 		public float SprintSpeed = 6.0f;
+		[SerializeField] private bool _isSprinting = false;
 		[Tooltip("Rotation speed of the character")]
 		public float RotationSpeed = 1.0f;
 		[Tooltip("Acceleration and deceleration")]
@@ -47,6 +48,7 @@ namespace StarterAssets
 		[SerializeField] private float _ungroundedBufferTime = 0.1f;
 		private float _currentUngroundedBufferCount = 0;
 		private bool _ungroundedBufferReached = false;
+		[SerializeField] private bool _ungrounded = false;
 
 		[Header("Cinemachine")]
 		[Tooltip("The follow target set in the Cinemachine Virtual Camera that the camera will follow")]
@@ -64,6 +66,7 @@ namespace StarterAssets
 		private float _rotationVelocity;
 		private float _verticalVelocity;
 		private float _terminalVelocity = 53.0f;
+		
 
 		// timeout deltatime
 		private float _jumpTimeoutDelta;
@@ -84,6 +87,8 @@ namespace StarterAssets
 		public event MovementEvent OnJump;
 		public event MovementEvent OnLand;
 		public event MovementEvent OnUngrounded;
+		public event MovementEvent OnRunStart;
+		public event MovementEvent OnRunEnd;
 
 
 
@@ -170,6 +175,8 @@ namespace StarterAssets
 			// set target speed based on move speed, sprint speed and if sprint is pressed
 			float targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
 
+			_isSprinting = targetSpeed == SprintSpeed;
+
 			// a simplistic acceleration and deceleration designed to be easy to remove, replace, or iterate upon
 
 			// note: Vector2's == operator uses approximation so is not floating point error prone, and is cheaper than magnitude
@@ -227,7 +234,7 @@ namespace StarterAssets
 
 
 				// the buffer timer is used to help verify instances when the player has left the ground
-				// for a minimal duration. If the buffer is reset when the player touches the ground.
+				// for a minimal duration. The buffer is reset when the player touches the ground.
 				// If the buffer is reached, meaning the player has been ungrounded for a sufficient duration,
 				// then the 'OnLand' movement event is called the next time the player touches the ground
 				if (_ungroundedBufferReached)
@@ -238,6 +245,7 @@ namespace StarterAssets
 				// reset the ungrounded buffer's states
 				_ungroundedBufferReached = false;
 				_currentUngroundedBufferCount = 0;
+				_ungrounded = false;
 
 				// Jump
 				if (_input.jump && _jumpTimeoutDelta <= 0.0f)
@@ -277,7 +285,7 @@ namespace StarterAssets
 					if (_currentUngroundedBufferCount > _ungroundedBufferTime)
 					{
 						_ungroundedBufferReached = true;
-
+						_ungrounded = true;
 						//raise the ungrounded event
 						OnUngrounded?.Invoke();
 					}
@@ -314,5 +322,9 @@ namespace StarterAssets
 		{
 			return _speed;
 		}
+
+		public bool IsUngrounded() { return _ungrounded; }
+
+		public bool IsSprinting() { return _isSprinting; }
 	}
 }

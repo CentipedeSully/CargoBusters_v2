@@ -31,7 +31,7 @@ public static class RandomUtils<T>
 }
 
 
-[CreateAssetMenu(fileName ="New Footstep Data Asset", menuName ="Footstep Data Asset")]
+[CreateAssetMenu(fileName ="New Footstep Data Asset", menuName = "Data Assets/Footstep Data Asset")]
 public class FootstepData : ScriptableObject
 {
     [Header("Footstep Source AudioClips")]

@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aab64ddc310c4f541948068f8f01fde8, type: 3}
+  m_Name: Breath Data Asset
+  m_EditorClassIdentifier: 
+  _maleHeavyBreaths: []
+  _maleReducedHeavyBreaths: []
+  _maleJumpBreaths: []
+  _maleLandBreaths: []
+  _femaleHeavyBreaths:
+  - {fileID: 8300000, guid: e025d59bc05e36a4b9c2ed9163299683, type: 3}
+  _femaleReducedHeavyBreaths:
+  - {fileID: 8300000, guid: f0e7798bebd7ede4bb4c8cd5cb0c73db, type: 3}
+  _femaleJumpBreaths:
+  - {fileID: 8300000, guid: dd686f01f0c904f46b27389d12340dcb, type: 3}
+  - {fileID: 8300000, guid: aa898be2c41a2794993d9132128b1172, type: 3}
+  - {fileID: 8300000, guid: ad74332526bedcf48a8ceb0b2d88c607, type: 3}
+  - {fileID: 8300000, guid: 4cb3a2471969305498185e648672762e, type: 3}
+  - {fileID: 8300000, guid: ced7eb68251c69a4a867083322b3d5dc, type: 3}
+  - {fileID: 8300000, guid: 9b9a59cd7e2c9fb498f7adb7a76ade31, type: 3}
+  - {fileID: 8300000, guid: c67094411db019d48a61f26811124bcc, type: 3}
+  - {fileID: 8300000, guid: 5cd34fba531f2174ab0a674051fc104b, type: 3}
+  _femaleLandBreaths:
+  - {fileID: 8300000, guid: 0bd9a80fa0744fb4aa1657dd5734aff7, type: 3}
+  - {fileID: 8300000, guid: 550109aa2fe5b504d824dff2682951f5, type: 3}
+  - {fileID: 8300000, guid: 3e94cefc3fd41fe44aa98142932a819e, type: 3}
+  - {fileID: 8300000, guid: b6d5ce83c1954134b9c046b8034a7019, type: 3}
+  - {fileID: 8300000, guid: f67ebea4f07d48d408fd3a388ccf8e79, type: 3}
+  - {fileID: 8300000, guid: a7f5d4512a9bc294d8938b22e9e1b785, type: 3}
+  - {fileID: 8300000, guid: cd6f3bb82f70066419b78d0210a579cf, type: 3}
