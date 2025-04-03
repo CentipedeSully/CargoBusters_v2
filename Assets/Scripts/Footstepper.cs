@@ -15,6 +15,9 @@ public class Footstepper : MonoBehaviour
     private AudioSource _footAudioSource;
     [SerializeField] private bool _footstepsEnabled = true;
 
+    public delegate void FootstepEvent();
+    public event FootstepEvent OnFootstep;
+
 
 
 
@@ -59,6 +62,7 @@ public class Footstepper : MonoBehaviour
             SetFootSound(FootSoundType.walk);
             PlayFootSound();
             ResetTick();
+            OnFootstep?.Invoke();
         }
     }
 
@@ -119,5 +123,9 @@ public class Footstepper : MonoBehaviour
             _currentFloorType = newType;
     }
 
+    public float GetTickDistance()
+    {
+        return _tickDistance;
+    }
 
 }
