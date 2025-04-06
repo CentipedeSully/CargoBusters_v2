@@ -326,5 +326,7 @@ namespace StarterAssets
 		public bool IsUngrounded() { return _ungrounded; }
 
 		public bool IsSprinting() { return _isSprinting; }
+
+		public bool IsForwardsPressed() { return GetComponent<StarterAssetsInputs>().move.y == 1; }
 	}
 }
