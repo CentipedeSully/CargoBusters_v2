@@ -7,13 +7,17 @@ public class Footstepper : MonoBehaviour
 {
     [SerializeField] private FirstPersonController _firstPersonController;
     [Tooltip("The minimum distance needed to trek before a footstep is made")]
-    [SerializeField] [Range(1,5)]private float _tickDistance = 4;
+    [SerializeField] [Range(1,5)]private float _tickDistance = 1.75f;
+    [SerializeField] private float _relateiveCrouchedTickDistance = .5f;
     [SerializeField] private float _currentTickProgress = 0;
 
     [SerializeField] private FloorType _currentFloorType = FloorType.unset;
     [SerializeField] private FootstepData _footstepData;
     private AudioSource _footAudioSource;
     [SerializeField] private bool _footstepsEnabled = true;
+    [SerializeField] private float _originalFootstepVolume;
+    [SerializeField] private float _crouchedVolume = .4f;
+    private float _targetTickDistance = 0;
 
     public delegate void FootstepEvent();
     public event FootstepEvent OnFootstep;
@@ -45,7 +49,11 @@ public class Footstepper : MonoBehaviour
     private void Update()
     {
         if (_firstPersonController != null && _footstepsEnabled)
+        {
+            ManageFootstepVolume();
             IncrementTick(_firstPersonController.GetSpeed() * Time.deltaTime);
+        }
+            
     }
 
 
@@ -57,12 +65,31 @@ public class Footstepper : MonoBehaviour
     private void IncrementTick(float distance)
     {
         _currentTickProgress += distance;
-        if (_currentTickProgress >= _tickDistance)
+
+
+        //apply the crouch tick distance if the player is crouching
+        if (_firstPersonController.IsCrouched() || _firstPersonController.IsCrouchTransitioning())
+            _targetTickDistance = _tickDistance * _relateiveCrouchedTickDistance;
+        else _targetTickDistance = _tickDistance;
+
+        if  (_currentTickProgress >= _targetTickDistance)
         {
             SetFootSound(FootSoundType.walk);
             PlayFootSound();
             ResetTick();
             OnFootstep?.Invoke();
+        }
+    }
+
+    private void ManageFootstepVolume()
+    {
+        if (_firstPersonController.IsCrouchTransitioning() || _firstPersonController.IsCrouched())
+        {
+            _footAudioSource.volume = _originalFootstepVolume * _crouchedVolume;
+        }
+        else
+        {
+            _footAudioSource.volume = _originalFootstepVolume;
         }
     }
 

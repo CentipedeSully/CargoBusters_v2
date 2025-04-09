@@ -1,4 +1,5 @@
 ﻿using System;
+using TMPro;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -15,9 +16,19 @@ namespace StarterAssets
 		[Header("Player")]
 		[Tooltip("Move speed of the character in m/s")]
 		public float MoveSpeed = 4.0f;
-		[Tooltip("Sprint speed of the character in m/s")]
+		public float _crouchSpeed = 2.0f;
+        [SerializeField] private bool _isCrouched = false;
+        private bool _isCrouchTransitioning = false;
+        private float _originalPlayerHeight;
+        [SerializeField] private float _crouchHeight = 1;
+        [SerializeField] private bool _isCrouchAvailable = true;
+        [SerializeField] private bool _isUncrouchAvailable = true;
+        private float _detectionDistance;
+        private Color _crouchGizmoColor = Color.green;
+        [Tooltip("Sprint speed of the character in m/s")]
 		public float SprintSpeed = 6.0f;
 		[SerializeField] private bool _isSprinting = false;
+		[SerializeField] private bool _isSprintAvailable = true;
 		[Tooltip("Rotation speed of the character")]
 		public float RotationSpeed = 1.0f;
 		[Tooltip("Acceleration and deceleration")]
@@ -50,15 +61,7 @@ namespace StarterAssets
 		private float _currentUngroundedBufferCount = 0;
 		private bool _ungroundedBufferReached = false;
 		[SerializeField] private bool _ungrounded = false;
-		[SerializeField] private bool _isCrouched = false;
-		private bool _isCrouchTransitioning = false;
-		private float _originalPlayerHeight;
-		[SerializeField] private float _crouchHeight = 1;
-		[SerializeField] private float _crouchSpeed = 2.5f;
-		[SerializeField] private bool _isCrouchAvailable = true;
-		[SerializeField] private bool _isUncrouchAvailable = true;
-		private float _detectionDistance;
-		private Color _crouchGizmoColor = Color.green;
+
 
 		[Header("Cinemachine")]
 		[Tooltip("The follow target set in the Cinemachine Virtual Camera that the camera will follow")]
@@ -185,12 +188,36 @@ namespace StarterAssets
 			}
 		}
 
+		private void UpdateSprintState()
+		{
+			//only spring if it's available and not using the crouch mechanic
+			if (_isSprintAvailable && (!_isCrouched && !_isCrouchTransitioning))
+			{
+                _isSprinting = _input.sprint;
+            }
+			else
+			{
+				_isSprinting = false;
+			}
+            
+        }
+
+		private float CalculateTargetSpeed()
+		{
+			if (_isSprinting)
+				return SprintSpeed;
+			else if (_isCrouched || _isCrouchTransitioning)
+				return _crouchSpeed;
+			else return MoveSpeed;
+		}
+
 		private void Move()
 		{
-			// set target speed based on move speed, sprint speed and if sprint is pressed
-			float targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
 
-			_isSprinting = targetSpeed == SprintSpeed;
+			UpdateSprintState();
+
+			// set target speed based on sprint/crouch/standing state
+			float targetSpeed = CalculateTargetSpeed();
 
 			// a simplistic acceleration and deceleration designed to be easy to remove, replace, or iterate upon
 
@@ -476,5 +503,8 @@ namespace StarterAssets
 		public bool IsSprinting() { return _isSprinting; }
 
 		public bool IsForwardsPressed() { return GetComponent<StarterAssetsInputs>().move.y == 1; }
+
+		public bool IsCrouched() { return _isCrouched; }
+		public bool IsCrouchTransitioning() { return _isCrouchTransitioning; }
 	}
 }
