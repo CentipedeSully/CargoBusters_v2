@@ -16,7 +16,10 @@ public enum FootSoundType
     unset,
     walk,
     run,
-    land,
+    landEasy,
+    landModerate,
+    landHeavy,
+    landNasty,
     jump
 }
 
@@ -37,7 +40,10 @@ public class FootstepData : ScriptableObject
     [Header("Footstep Source AudioClips")]
     [SerializeField] private List<AudioClip> _generalWalksteps = new();
     [SerializeField] private List<AudioClip> _generalRunsteps = new();
-    [SerializeField] private List<AudioClip> _generalLandsteps = new();
+    [SerializeField] private List<AudioClip> _generalEasyLandsteps = new();
+    [SerializeField] private List<AudioClip> _generalModerateLandsteps = new();
+    [SerializeField] private List<AudioClip> _generalHeavyLandsteps = new();
+    [SerializeField] private List<AudioClip> _generalNastyLandsteps = new();
     [SerializeField] private List<AudioClip> _generalJumpsteps = new();
 
     [Space(20)]
@@ -82,8 +88,17 @@ public class FootstepData : ScriptableObject
                 case FootSoundType.run:
                     return RandomUtils<AudioClip>.GetRandomElement(_generalRunsteps);
 
-                case FootSoundType.land:
-                    return RandomUtils<AudioClip>.GetRandomElement(_generalLandsteps);
+                case FootSoundType.landEasy:
+                    return RandomUtils<AudioClip>.GetRandomElement(_generalEasyLandsteps);
+
+                case FootSoundType.landModerate:
+                    return RandomUtils<AudioClip>.GetRandomElement(_generalModerateLandsteps);
+
+                case FootSoundType.landHeavy:
+                    return RandomUtils<AudioClip>.GetRandomElement(_generalHeavyLandsteps);
+
+                case FootSoundType.landNasty:
+                    return RandomUtils<AudioClip>.GetRandomElement(_generalNastyLandsteps);
 
                 case FootSoundType.jump:
                     return RandomUtils<AudioClip>.GetRandomElement(_generalJumpsteps);
@@ -101,7 +116,7 @@ public class FootstepData : ScriptableObject
                 case FootSoundType.run:
                     return RandomUtils<AudioClip>.GetRandomElement(_woodRunsteps);
 
-                case FootSoundType.land:
+                case FootSoundType.landModerate:
                     return RandomUtils<AudioClip>.GetRandomElement(_woodLandsteps);
 
                 case FootSoundType.jump:
@@ -120,7 +135,7 @@ public class FootstepData : ScriptableObject
                 case FootSoundType.run:
                     return RandomUtils<AudioClip>.GetRandomElement(_metalRunsteps);
 
-                case FootSoundType.land:
+                case FootSoundType.landModerate:
                     return RandomUtils<AudioClip>.GetRandomElement(_metalLandsteps);
 
                 case FootSoundType.jump:

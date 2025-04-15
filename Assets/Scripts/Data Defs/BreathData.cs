@@ -11,10 +11,12 @@ using UnityEngine;
 public enum BreathType{
     unset,
     quiet,
-    heavy,
-    reducing,
+    continuousHeavy,
+    continuousLight,
     jump,
-    land
+    landModerate,
+    landHeavy,
+    landNasty
 
 }
 
@@ -29,16 +31,18 @@ public enum VoiceGender
 public class BreathData : ScriptableObject
 {
     [Header("Breathing Source AudioClips")]
-    [SerializeField] private List<AudioClip> _maleHeavyBreaths = new();
-    [SerializeField] private List<AudioClip> _maleReducedHeavyBreaths = new();
+    [SerializeField] private List<AudioClip> _maleContinuousHeavyBreaths = new();
+    [SerializeField] private List<AudioClip> _maleContinuousLightBreaths = new();
     [SerializeField] private List<AudioClip> _maleJumpBreaths = new();
     [SerializeField] private List<AudioClip> _maleLandBreaths = new();
 
     [Space(20)]
-    [SerializeField] private List<AudioClip> _femaleHeavyBreaths = new();
-    [SerializeField] private List<AudioClip> _femaleReducedHeavyBreaths = new();
+    [SerializeField] private List<AudioClip> _femaleContinuousHeavyBreaths = new();
+    [SerializeField] private List<AudioClip> _femaleContinuousLightBreaths = new();
     [SerializeField] private List<AudioClip> _femaleJumpBreaths = new();
-    [SerializeField] private List<AudioClip> _femaleLandBreaths = new();
+    [SerializeField] private List<AudioClip> _femaleLandModerateBreaths = new();
+    [SerializeField] private List<AudioClip> _femaleLandHeavyBreaths = new();
+    [SerializeField] private List<AudioClip> _femaleLandNastyBreaths = new();
 
 
 
@@ -55,18 +59,18 @@ public class BreathData : ScriptableObject
             switch (breathType)
             {
 
-                case BreathType.heavy:
-                    return RandomUtils<AudioClip>.GetRandomElement(_maleHeavyBreaths);
+                case BreathType.continuousHeavy:
+                    return RandomUtils<AudioClip>.GetRandomElement(_maleContinuousHeavyBreaths);
 
-                case BreathType.reducing:
-                    return RandomUtils<AudioClip>.GetRandomElement(_maleReducedHeavyBreaths);
+                case BreathType.continuousLight:
+                    return RandomUtils<AudioClip>.GetRandomElement(_maleContinuousLightBreaths);
 
 
                 case BreathType.jump:
                     return RandomUtils<AudioClip>.GetRandomElement(_maleJumpBreaths);
 
 
-                case BreathType.land:
+                case BreathType.landModerate:
                     return RandomUtils<AudioClip>.GetRandomElement(_maleLandBreaths);
                     
 
@@ -83,20 +87,26 @@ public class BreathData : ScriptableObject
             switch (breathType)
             {
 
-                case BreathType.heavy:
-                    return RandomUtils<AudioClip>.GetRandomElement(_femaleHeavyBreaths);
+                case BreathType.continuousHeavy:
+                    return RandomUtils<AudioClip>.GetRandomElement(_femaleContinuousHeavyBreaths);
 
-                case BreathType.reducing:
-                    return RandomUtils<AudioClip>.GetRandomElement(_femaleReducedHeavyBreaths);
+                case BreathType.continuousLight:
+                    return RandomUtils<AudioClip>.GetRandomElement(_femaleContinuousLightBreaths);
 
 
                 case BreathType.jump:
                     return RandomUtils<AudioClip>.GetRandomElement(_femaleJumpBreaths);
 
 
-                case BreathType.land:
-                    return RandomUtils<AudioClip>.GetRandomElement(_femaleLandBreaths);
-                    
+                case BreathType.landModerate:
+                    return RandomUtils<AudioClip>.GetRandomElement(_femaleLandModerateBreaths);
+
+                case BreathType.landHeavy:
+                    return RandomUtils<AudioClip>.GetRandomElement(_femaleLandHeavyBreaths);
+
+                case BreathType.landNasty:
+                    return RandomUtils<AudioClip>.GetRandomElement(_femaleLandNastyBreaths);
+
 
                 default:
                     Debug.LogWarning(

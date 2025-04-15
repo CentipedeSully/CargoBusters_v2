@@ -77,9 +77,13 @@ namespace StarterAssets
 		// player
 		private float _speed;
 		private float _rotationVelocity;
-		private float _verticalVelocity;
+		[SerializeField]private float _verticalVelocity;
 		private float _terminalVelocity = 53.0f;
-		
+		[SerializeField] private FootSoundType _landing = FootSoundType.landEasy;
+		[SerializeField] private float _moderateLandingMinVelocity = 5f;
+		[SerializeField] private float _heavyLandingMinVelocity = 9f;
+		[SerializeField] private float _nastyLandingMinVelocity = 15f;
+
 
 		// timeout deltatime
 		private float _jumpTimeoutDelta;
@@ -97,8 +101,9 @@ namespace StarterAssets
 
 
 		public delegate void MovementEvent();
+		public delegate void LandEvent(FootSoundType landingType);
+		public event LandEvent OnLand;
 		public event MovementEvent OnJump;
-		public event MovementEvent OnLand;
 		public event MovementEvent OnUngrounded;
 		public event MovementEvent OnRunEnter;
 		public event MovementEvent OnRunExit;
@@ -281,7 +286,7 @@ namespace StarterAssets
 				// then the 'OnLand' movement event is called the next time the player touches the ground
 				if (_ungroundedBufferReached)
 				{
-					OnLand?.Invoke();
+					OnLand?.Invoke(_landing);
 				}
 
 				// reset the ungrounded buffer's states
@@ -339,6 +344,17 @@ namespace StarterAssets
 			{
 				_verticalVelocity += Gravity * Time.deltaTime;
 			}
+
+			if (_verticalVelocity <= -_nastyLandingMinVelocity)
+				_landing = FootSoundType.landNasty;
+
+			else if (_verticalVelocity <= -_heavyLandingMinVelocity)
+				_landing = FootSoundType.landHeavy;
+
+			else if (_verticalVelocity <= -_moderateLandingMinVelocity)
+				_landing = FootSoundType.landModerate;
+
+			else _landing = FootSoundType.landEasy;
 		}
 
 		private void Crouch()

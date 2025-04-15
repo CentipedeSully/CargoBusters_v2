@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: aab64ddc310c4f541948068f8f01fde8, type: 3}
   m_Name: Breath Data Asset
   m_EditorClassIdentifier: 
-  _maleHeavyBreaths: []
-  _maleReducedHeavyBreaths: []
+  _maleContinuousHeavyBreaths: []
+  _maleContinuousLightBreaths: []
   _maleJumpBreaths: []
   _maleLandBreaths: []
-  _femaleHeavyBreaths:
+  _femaleContinuousHeavyBreaths:
   - {fileID: 8300000, guid: e025d59bc05e36a4b9c2ed9163299683, type: 3}
-  _femaleReducedHeavyBreaths:
+  _femaleContinuousLightBreaths:
   - {fileID: 8300000, guid: f0e7798bebd7ede4bb4c8cd5cb0c73db, type: 3}
   _femaleJumpBreaths:
   - {fileID: 8300000, guid: dd686f01f0c904f46b27389d12340dcb, type: 3}
@@ -29,11 +29,24 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 9b9a59cd7e2c9fb498f7adb7a76ade31, type: 3}
   - {fileID: 8300000, guid: c67094411db019d48a61f26811124bcc, type: 3}
   - {fileID: 8300000, guid: 5cd34fba531f2174ab0a674051fc104b, type: 3}
-  _femaleLandBreaths:
-  - {fileID: 8300000, guid: 0bd9a80fa0744fb4aa1657dd5734aff7, type: 3}
-  - {fileID: 8300000, guid: 550109aa2fe5b504d824dff2682951f5, type: 3}
-  - {fileID: 8300000, guid: 3e94cefc3fd41fe44aa98142932a819e, type: 3}
-  - {fileID: 8300000, guid: b6d5ce83c1954134b9c046b8034a7019, type: 3}
-  - {fileID: 8300000, guid: f67ebea4f07d48d408fd3a388ccf8e79, type: 3}
-  - {fileID: 8300000, guid: a7f5d4512a9bc294d8938b22e9e1b785, type: 3}
-  - {fileID: 8300000, guid: cd6f3bb82f70066419b78d0210a579cf, type: 3}
+  _femaleLandModerateBreaths:
+  - {fileID: 8300000, guid: a2bcfab4b49f916448c5bdc6bac96da7, type: 3}
+  - {fileID: 8300000, guid: 40c0236b8de07fa4eb8d2c038a5418f8, type: 3}
+  - {fileID: 8300000, guid: 636c38b4bd7aaa547945f21e3a54c38d, type: 3}
+  - {fileID: 8300000, guid: 9371a619775409d4d83a4d9a1ab0c3f4, type: 3}
+  - {fileID: 8300000, guid: b456ad806e4c10247a8c81516c5e3a88, type: 3}
+  - {fileID: 8300000, guid: e5921d594721f92449d1cb06e30d1822, type: 3}
+  - {fileID: 8300000, guid: c5652629087fcc14a89b0fe9b2f9b7a2, type: 3}
+  _femaleLandHeavyBreaths:
+  - {fileID: 8300000, guid: 069e8d28b4292454187924b43d44bd97, type: 3}
+  - {fileID: 8300000, guid: 917fcebfc975a75429c110f6c7f1387f, type: 3}
+  - {fileID: 8300000, guid: 5b4ebdf3f6961694cbd46496d2ccaf1b, type: 3}
+  - {fileID: 8300000, guid: 318c0dd7750daa54aa645c4f7067db50, type: 3}
+  - {fileID: 8300000, guid: 7a5b75b4dcc4016419c9f291d72a7a7e, type: 3}
+  - {fileID: 8300000, guid: 20ccd7655f796c640a70c315829b68f0, type: 3}
+  - {fileID: 8300000, guid: 5b115acdc4a74594cb60a8ed8ee275c3, type: 3}
+  _femaleLandNastyBreaths:
+  - {fileID: 8300000, guid: ce6bc27d7a16d9e4bb2cf74a7b397392, type: 3}
+  - {fileID: 8300000, guid: c67a0647d28fe644990c65f353bd43ba, type: 3}
+  - {fileID: 8300000, guid: c67a0647d28fe644990c65f353bd43ba, type: 3}
+  - {fileID: 8300000, guid: 6dded875e32740a47a91b75ceed815f7, type: 3}

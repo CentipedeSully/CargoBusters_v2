@@ -139,7 +139,7 @@ public class Breather : MonoBehaviour
                         if (_heavyBreathingSource.loop == false)
                             _heavyBreathingSource.loop = true;
 
-                        _heavyBreathingSource.clip = _breathData.GetRandomClip(_voiceGender, BreathType.heavy);
+                        _heavyBreathingSource.clip = _breathData.GetRandomClip(_voiceGender, BreathType.continuousHeavy);
                         _heavyBreathingSource.Play();
 
                     }
@@ -152,7 +152,7 @@ public class Breather : MonoBehaviour
                 _currentCalmedTime = 0;
                 _currentEndTime = 0;
                 _heavyBreathState = breathState.heavyBreaths;
-                _heavyBreathingSource.clip = _breathData.GetRandomClip(_voiceGender, BreathType.heavy);
+                _heavyBreathingSource.clip = _breathData.GetRandomClip(_voiceGender, BreathType.continuousHeavy);
                 _heavyBreathingSource.Play();
             }
 
@@ -183,7 +183,7 @@ public class Breather : MonoBehaviour
                 {
                     _currentEndTime = 0;
                     _heavyBreathState = breathState.calmingBreaths;
-                    _heavyBreathingSource.clip = _breathData.GetRandomClip(_voiceGender, BreathType.reducing);
+                    _heavyBreathingSource.clip = _breathData.GetRandomClip(_voiceGender, BreathType.continuousLight);
                     _heavyBreathingSource.Play();
                 }
             }
@@ -252,13 +252,30 @@ public class Breather : MonoBehaviour
         }
     }
 
-    private void TriggerLandingBreath()
+    private void TriggerLandingBreath(FootSoundType landingType)
     {
         if (_isBreathEnabled && _audioSource != null && _breathData != null)
         {
             OnResumeHeavyBreathing?.Invoke();
-            _audioSource.clip = _breathData.GetRandomClip(_voiceGender, BreathType.land);
-            _audioSource.Play();
+
+            switch (landingType)
+            {
+                case FootSoundType.landModerate:
+                    _audioSource.clip = _breathData.GetRandomClip(_voiceGender, BreathType.landModerate);
+                    _audioSource.Play();
+                    break;
+
+                case FootSoundType.landHeavy:
+                    _audioSource.clip = _breathData.GetRandomClip(_voiceGender, BreathType.landHeavy);
+                    _audioSource.Play();
+                    break;
+
+                case FootSoundType.landNasty:
+                    _audioSource.clip = _breathData.GetRandomClip(_voiceGender, BreathType.landNasty);
+                    _audioSource.Play();
+                    break;
+            }
+            
         }
     }
 

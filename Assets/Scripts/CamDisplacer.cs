@@ -27,10 +27,12 @@ public class CamDisplacer : MonoBehaviour
 
     [Header("ScreenShake")]
     [SerializeField] private bool _isScreenShaking = false;
-    [SerializeField] private float _shakeDuration = .2f;
+    [SerializeField] private float _defaultShakeDuration = .2f;
     private float _currentShakeTime = 0;
-    [SerializeField] private float _displacementFrequency = .02f;
-    [SerializeField] private Vector2 _displacementRange = new Vector2(.02f, .02f);
+    [SerializeField] private float _defaultDisplacementFrequency = .02f;
+    [SerializeField] private Vector2 _defaultDisplacementRange = new Vector2(.02f, .02f);
+    [SerializeField] private Vector2 _displacementStrength;
+    [SerializeField] private float _shakeDuration;
 
 
 
@@ -44,12 +46,12 @@ public class CamDisplacer : MonoBehaviour
 
     private void OnEnable()
     {
-        _playerController.OnLand += ShakeScreen;
+        _playerController.OnLand += ShakeScreenOnHardLandings;
     }
 
     private void OnDisable()
     {
-        _playerController.OnLand -= ShakeScreen;
+        _playerController.OnLand -= ShakeScreenOnHardLandings;
     }
 
     private void Update()
@@ -154,7 +156,7 @@ public class CamDisplacer : MonoBehaviour
         if (_isScreenShaking)
         {
             if (_currentShakeTime == 0)
-                InvokeRepeating(nameof(DisplaceCam), 0, _displacementFrequency);
+                InvokeRepeating(nameof(DisplaceCam), 0, _defaultDisplacementFrequency);
 
             _currentShakeTime += Time.deltaTime;
 
@@ -174,8 +176,8 @@ public class CamDisplacer : MonoBehaviour
     }
     private void DisplaceCam()
     {
-        float randomDisplacementX = Random.Range(-_displacementRange.x, _displacementRange.x);
-        float randomDisplacementY = Random.Range(-_displacementRange.y, _displacementRange.y);
+        float randomDisplacementX = Random.Range(-_displacementStrength.x, _displacementStrength.x);
+        float randomDisplacementY = Random.Range(-_displacementStrength.y, _displacementStrength.y);
         Vector3 randomDisplacement = new Vector3(randomDisplacementX, randomDisplacementY, _originalLocalPosition.z);
         _cameraRoot.localPosition = _originalLocalPosition + randomDisplacement;
     }
@@ -188,21 +190,40 @@ public class CamDisplacer : MonoBehaviour
         _isScreenShaking = false;
     }
 
-
-    //externals
-    public void SetShakeDuration(float newDuration)
+    private void ShakeScreenOnHardLandings(FootSoundType landing)
     {
-        _shakeDuration = newDuration;
+        if (landing == FootSoundType.landModerate)
+            ShakeScreen();
+        else if (landing == FootSoundType.landHeavy || landing == FootSoundType.landNasty)
+            ShakeScreen(0.03f, _defaultDisplacementRange.magnitude * 2);
     }
 
+
+    //externals
     public void ShakeScreen()
     {
+
+        ShakeScreen(0, 0);
+    }
+
+    public void ShakeScreen(float duration, float strength)
+    {
+        if (duration <= 0)
+            _shakeDuration = _defaultShakeDuration;
+        else _shakeDuration = duration;
+
+        if (strength <= 0)
+            _displacementStrength = _defaultDisplacementRange;
+        else _displacementStrength = new Vector2(strength,strength);
+
+
         //interrupt current shake
         if (_isScreenShaking)
             CancelScreenShake();
 
         //start new shake
         _isScreenShaking = true;
+
     }
 
 

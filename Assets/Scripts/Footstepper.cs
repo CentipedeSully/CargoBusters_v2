@@ -130,10 +130,10 @@ public class Footstepper : MonoBehaviour
 
     }
 
-    private void TriggerLandingSideEffects()
+    private void TriggerLandingSideEffects(FootSoundType landingType)
     {
         //play the land sound
-        SetFootSound(FootSoundType.land);
+        SetFootSound(landingType);
         PlayFootSound();
 
 
