@@ -155,4 +155,18 @@ public class LedgeDetecter : MonoBehaviour
 
     
 
+    //externals
+    public bool IsLedgeDetected()
+    {
+        return _isLedgeDetected;
+    }
+
+    public Vector3 GetTransitionPosition()
+    {
+        if (_isLedgeDetected)
+            return _openSpacePosition;
+        else return transform.position;
+    }
+
+
 }

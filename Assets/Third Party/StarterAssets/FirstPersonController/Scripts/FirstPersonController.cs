@@ -43,24 +43,29 @@ namespace StarterAssets
 		[Space(10)]
 		[Tooltip("Time required to pass before being able to jump again. Set to 0f to instantly jump again")]
 		public float JumpTimeout = 0.1f;
-		[Tooltip("Time required to pass before entering the fall state. Useful for walking down stairs")]
+		[Tooltip("If the jump timeout has completed")]
+		[SerializeField] private bool _jumpTimeoutCompleted = true;
+		[Tooltip("Time required to pass before entering the fall state. Useful for walking down stairs or across uneven terrain")]
 		public float FallTimeout = 0.15f;
-
-		[Header("Player Grounded")]
-		[Tooltip("If the character is grounded or not. Not part of the CharacterController built in grounded check")]
-		public bool Grounded = true;
-		[Tooltip("Useful for rough ground")]
+        [Tooltip("If the character has been falling for long enough to be considered No Longer Grounded")]
+        [SerializeField] private bool _fallTimeoutCompleted = false;
+        [Header("Player Grounded")]
+		[Tooltip("If the character is physically touching the ground or not at this instance. " +
+				"Not part of the CharacterController built in grounded check. " +
+				"Also doesn't consider the fallout timer.")]
+		[SerializeField] private bool _literallyGrounded = true;
+		[Tooltip("If the character is considered to be grounded AFTER considering the fallout timer. " +
+			"This is the functional grounded state, and this state is returned to other scripts")]
+		[SerializeField] private bool _logicallyGrounded = true;
+		
+        
+        [Tooltip("Useful for rough ground")]
 		public float GroundedOffset = -0.14f;
 		[Tooltip("The radius of the grounded check. Should match the radius of the CharacterController")]
 		public float GroundedRadius = 0.5f;
 		[Tooltip("What layers the character uses as ground")]
 		public LayerMask GroundLayers;
-		[Tooltip("The minimal time to wait before triggering interal 'left the ground' states. " +
-			"Used to prevent tiny vertical displacements from triggering unexpected behavior")]
-		[SerializeField] private float _ungroundedBufferTime = 0.1f;
-		private float _currentUngroundedBufferCount = 0;
-		private bool _ungroundedBufferReached = false;
-		[SerializeField] private bool _ungrounded = false;
+
 
 
 		[Header("Cinemachine")]
@@ -75,8 +80,10 @@ namespace StarterAssets
 		private float _cinemachineTargetPitch;
 
 		// player
+		private Vector3 _moveDirection;
 		private float _speed;
 		private float _rotationVelocity;
+		[Header("Fall heights")]
 		[SerializeField]private float _verticalVelocity;
 		private float _terminalVelocity = 53.0f;
 		[SerializeField] private FootSoundType _landing = FootSoundType.landEasy;
@@ -85,13 +92,16 @@ namespace StarterAssets
 		[SerializeField] private float _nastyLandingMinVelocity = 15f;
 
 
-		// timeout deltatime
+		// timers & time flags
 		private float _jumpTimeoutDelta;
 		private float _fallTimeoutDelta;
+		private bool _jumpTriggered = false;
 
-	
+
+
+
 #if ENABLE_INPUT_SYSTEM
-		private PlayerInput _playerInput;
+        private PlayerInput _playerInput;
 #endif
 		private CharacterController _controller;
 		private StarterAssetsInputs _input;
@@ -112,7 +122,7 @@ namespace StarterAssets
 
 
 
-
+		//optional Compiles
 		private bool IsCurrentDeviceMouse
 		{
 			get
@@ -125,6 +135,8 @@ namespace StarterAssets
 			}
 		}
 
+
+		//monobehaviours
 		private void Awake()
 		{
 			// get a reference to our main camera
@@ -153,10 +165,10 @@ namespace StarterAssets
 
 		private void Update()
 		{
-			JumpAndGravity();
-			GroundedCheck();
-			Crouch();
-			Move();
+			DetermineCharacterStates();
+			ApplyVelocities();
+			MoveCharacter();
+			
 		}
 
 		private void LateUpdate()
@@ -164,14 +176,386 @@ namespace StarterAssets
 			CameraRotation();
 		}
 
-		private void GroundedCheck()
+
+        private void OnDrawGizmos()
+        {
+            DrawCrouchHeightDetection();
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+
+            Color transparentGreen = new Color(0.0f, 1.0f, 0.0f, 0.35f);
+            Color transparentRed = new Color(1.0f, 0.0f, 0.0f, 0.35f);
+
+            if (_literallyGrounded) Gizmos.color = transparentGreen;
+            else Gizmos.color = transparentRed;
+
+            // when selected, draw a gizmo in the position of, and matching radius of, the grounded collider
+            Gizmos.DrawSphere(new Vector3(transform.position.x, transform.position.y - GroundedOffset, transform.position.z), GroundedRadius);
+        }
+
+
+
+        //internals
+		private void DetermineCharacterStates()
+		{
+			UpdateGroundedStates();
+			UpdateSprintState();
+			UpdateLandingSound();
+			ManageCrouch();
+			
+		}
+
+        private void UpdateGroundedStates()
 		{
 			// set sphere position, with offset
 			Vector3 spherePosition = new Vector3(transform.position.x, transform.position.y - GroundedOffset, transform.position.z);
-			Grounded = Physics.CheckSphere(spherePosition, GroundedRadius, GroundLayers, QueryTriggerInteraction.Ignore);
-		}
+			_literallyGrounded = Physics.CheckSphere(spherePosition, GroundedRadius, GroundLayers, QueryTriggerInteraction.Ignore);
 
-		private void CameraRotation()
+            if (_literallyGrounded)
+            {
+				//Were we previously falling?
+				if (_fallTimeoutCompleted)
+				{
+					_fallTimeoutCompleted = false;
+					_logicallyGrounded = true;
+                    OnLand?.Invoke(_landing);
+                }
+
+                // reset the fall timeout timer
+                _fallTimeoutDelta = FallTimeout;
+
+                
+            }
+			else
+			{
+                // tick the fall timeout, if it hasn't yet completed
+				if (!_fallTimeoutCompleted)
+				{
+                    _fallTimeoutDelta -= Time.deltaTime;
+
+					if (_fallTimeoutDelta <= 0)
+					{
+						_fallTimeoutCompleted = true;
+						_logicallyGrounded = false;
+						OnUngrounded?.Invoke();
+					}
+                }
+
+            }
+        }
+        private void UpdateSprintState()
+        {
+            //only spring if it's available and not using the crouch mechanic
+            if (_isSprintAvailable && (!_isCrouched && !_isCrouchTransitioning))
+            {
+                _isSprinting = _input.sprint;
+            }
+            else
+            {
+                _isSprinting = false;
+            }
+
+        }
+        private void UpdateLandingSound()
+		{
+            if (_verticalVelocity <= -_nastyLandingMinVelocity)
+                _landing = FootSoundType.landNasty;
+
+            else if (_verticalVelocity <= -_heavyLandingMinVelocity)
+                _landing = FootSoundType.landHeavy;
+
+            else if (_verticalVelocity <= -_moderateLandingMinVelocity)
+                _landing = FootSoundType.landModerate;
+
+            else _landing = FootSoundType.landEasy;
+        }
+        private void ManageCrouch()
+        {
+            //detect for any obstructions if the crouch mechanic is working
+            if (_isCrouchTransitioning || _isCrouched)
+            {
+                _detectionDistance = _originalPlayerHeight - _controller.height;
+                Vector3 topOfPlayer = transform.position + _controller.height * Vector3.up;
+                Vector3 detectionEnd = topOfPlayer + Vector3.up * _detectionDistance;
+                Collider[] detectedColliders = Physics.OverlapCapsule(topOfPlayer, detectionEnd, _controller.radius, GroundLayers);
+
+                if (detectedColliders.Length > 0)
+                {
+                    _isUncrouchAvailable = false;
+                    //Debug.Log($"Standup Unavailable: {detectedColliders.Length} colliders detected");
+                }
+                else
+                {
+                    _isUncrouchAvailable = true;
+                    //Debug.Log("Overhead Cleared!");
+                }
+
+
+            }
+
+
+            if (!_isCrouched)
+            {
+                //start crouching if
+                //... the action is available,
+                //... the button is being pressed,
+                //... and we ARE NOT ALREADY TRANSITIONING INTO A CROUCH
+                if (_isCrouchAvailable && _input.crouch && !_isCrouchTransitioning)
+                {
+                    _isCrouchTransitioning = true;
+                }
+
+                //keep transitioning into a crouch if the button is still pressed (and if we're still able to crouch) [OR IF WE SUDDENLY GOT BLOCKED]
+                if (_isCrouchTransitioning && ((_input.crouch && _isCrouchAvailable) || !_isUncrouchAvailable))
+                {
+                    float newHeight = _controller.height + (-Time.deltaTime * _crouchSpeed);
+
+                    //complete the crouch if we reached our desired crouch height
+                    if (newHeight < _crouchHeight)
+                    {
+                        newHeight = _crouchHeight;
+                        _isCrouchTransitioning = false;
+                        _isCrouched = true;
+                        OnCrouchEnter?.Invoke();
+                    }
+
+                    _controller.height = newHeight;
+                }
+
+                //raise back up if either 'the button got released' or 'we suddenly aren't allowed to crouch' [ALSO IF WE AREN'T BLOCKED]
+                else if (_isCrouchTransitioning && (!_input.crouch || !_isCrouchAvailable) && _isUncrouchAvailable)
+                {
+                    float newHeight = _controller.height + Time.deltaTime * _crouchSpeed;
+
+                    //end the transition if we've raised back to our original height
+                    if (newHeight > _originalPlayerHeight)
+                    {
+                        newHeight = _originalPlayerHeight;
+                        _isCrouchTransitioning = false;
+                    }
+
+                    _controller.height = newHeight;
+                }
+            }
+
+            else
+            {
+                //start raising up if
+                //... we have space to stand up,
+                //... crouch got either 'released' or 'interrupted',
+                //... and we ARE NOT ALREADY TRANSITIONING 
+                if (_isUncrouchAvailable && (!_input.crouch || !_isCrouchAvailable) && !_isCrouchTransitioning)
+                {
+                    _isCrouchTransitioning = true;
+                }
+
+                //keep raising up if 1) we have space to stand, and 2) the player either can't crouch here or isn't pressing crouch
+                if (_isCrouchTransitioning && _isUncrouchAvailable && (!_input.crouch || !_isCrouchAvailable))
+                {
+                    float newHeight = _controller.height + Time.deltaTime * _crouchSpeed;
+
+                    //end the transition if we've raised back to our original height
+                    if (newHeight > _originalPlayerHeight)
+                    {
+                        newHeight = _originalPlayerHeight;
+                        _isCrouchTransitioning = false;
+                        _isCrouched = false;
+                        OnCrouchExit?.Invoke();
+                    }
+
+                    _controller.height = newHeight;
+                }
+
+                //else lower back down into position if we got blocked or the player wants to keep crouching
+                else if (_isCrouchTransitioning && (!_isUncrouchAvailable || (_input.crouch && _isCrouchAvailable)))
+                {
+                    float newHeight = _controller.height + (-Time.deltaTime * _crouchSpeed);
+
+                    //complete the crouch if we reached our desired crouch height
+                    if (newHeight < _crouchHeight)
+                    {
+                        newHeight = _crouchHeight;
+                        _isCrouchTransitioning = false;
+                    }
+
+                    _controller.height = newHeight;
+                }
+            }
+
+
+        }
+
+        private void Crouch()
+        {
+            if (_isCrouched)
+            {
+                //update isUncrouchAvailable.
+                //Just capsuleCast on the player's position by the player's height.
+                //it's available if nothing was detected.
+            }
+
+
+            //first manage the core crouch state
+            if (!_isCrouched && _isCrouchAvailable && _input.crouch)
+            {
+                _isCrouched = true;
+                
+                //resize collider
+                
+
+                OnCrouchEnter?.Invoke();
+            }
+            else if (_isCrouched && (!_input.crouch || !_isCrouchAvailable) && _isUncrouchAvailable) //make sure we're actually able to uncrouch, too
+            {
+                _isCrouched = false;
+                OnCrouchExit?.Invoke();
+            }
+
+            //next, 
+
+
+        }
+
+
+
+
+        private void ApplyVelocities()
+		{
+			ApplyGravity();
+			ApplyHorizontalMovement();
+			ManageJump();
+			CalculateMoveDirection();
+		}
+        private void ApplyGravity()
+        {
+            if (_literallyGrounded) //NOT logically, but Literally
+            {
+                // stop our velocity dropping infinitely when grounded
+                if (_verticalVelocity < 0.0f)
+                {
+                    _verticalVelocity = -2f;
+                }
+
+            }
+            else
+            {
+                // apply gravity over time if under terminal (multiply by delta time twice to linearly speed up over time)
+                if (_verticalVelocity < _terminalVelocity)
+                {
+                    _verticalVelocity += Gravity * Time.deltaTime;
+                }
+
+            }
+        }
+		private void ApplyHorizontalMovement()
+		{
+            // set target speed based on sprint/crouch/standing state
+            float targetSpeed = CalculateTargetSpeed();
+
+            // a simplistic acceleration and deceleration designed to be easy to remove, replace, or iterate upon
+
+            // note: Vector2's == operator uses approximation so is not floating point error prone, and is cheaper than magnitude
+            // if there is no input, set the target speed to 0
+            if (_input.move == Vector2.zero) targetSpeed = 0.0f;
+
+            // a reference to the players current horizontal velocity
+            float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
+
+            float speedOffset = 0.1f;
+            float inputMagnitude = _input.analogMovement ? _input.move.magnitude : 1f;
+
+            // accelerate or decelerate to target speed
+            if (currentHorizontalSpeed < targetSpeed - speedOffset || currentHorizontalSpeed > targetSpeed + speedOffset)
+            {
+                // creates curved result rather than a linear one giving a more organic speed change
+                // note T in Lerp is clamped, so we don't need to clamp our speed
+                _speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed * inputMagnitude, Time.deltaTime * SpeedChangeRate);
+
+                // round speed to 3 decimal places
+                _speed = Mathf.Round(_speed * 1000f) / 1000f;
+            }
+            else
+            {
+                _speed = targetSpeed;
+            }
+
+            
+
+            
+        }
+        private float CalculateTargetSpeed()
+        {
+            if (_isSprinting)
+                return SprintSpeed;
+            else if (_isCrouched || _isCrouchTransitioning)
+                return _crouchSpeed;
+            else return MoveSpeed;
+        }
+        private void ManageJump()
+        {
+            if (_logicallyGrounded)
+            {
+                //jump if it's pressed and ready
+                if (_jumpTimeoutCompleted && _input.jump)
+                {
+					_input.jump = false;
+
+                    //reset the timer
+                    _jumpTimeoutCompleted = false;
+
+                    // the square root of H * -2 * G = how much velocity needed to reach desired height
+                    _verticalVelocity = Mathf.Sqrt(JumpHeight * -2f * Gravity);
+
+                    //signal the jump
+                    OnJump?.Invoke();
+                }
+
+
+                //else cooldown the jump timer (only when grounded)
+                else
+                {
+                    //tick down the timeout if it isn't already completed
+                    if (!_jumpTimeoutCompleted)
+                    {
+                        _jumpTimeoutDelta -= Time.deltaTime;
+
+                        if (_jumpTimeoutDelta <= 0)
+                        {
+                            _jumpTimeoutCompleted = true;
+                            _jumpTimeoutDelta = JumpTimeout;
+                        }
+                    }
+                }
+            }
+        }
+        private void CalculateMoveDirection()
+        {
+            // normalise input direction
+            _moveDirection = new Vector3(_input.move.x, 0.0f, _input.move.y).normalized;
+
+            // note: Vector2's != operator uses approximation so is not floating point error prone, and is cheaper than magnitude
+            // if there is a move input rotate player when the player is moving
+            if (_input.move != Vector2.zero)
+            {
+                // move
+                _moveDirection = transform.right * _input.move.x + transform.forward * _input.move.y;
+            }
+        }
+
+
+
+
+        private void MoveCharacter()
+		{
+            _controller.Move(_moveDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+        }
+
+
+
+
+        private void CameraRotation()
 		{
 			// if there is an input
 			if (_input.look.sqrMagnitude >= _threshold)
@@ -192,333 +576,39 @@ namespace StarterAssets
 				transform.Rotate(Vector3.up * _rotationVelocity);
 			}
 		}
-
-		private void UpdateSprintState()
-		{
-			//only spring if it's available and not using the crouch mechanic
-			if (_isSprintAvailable && (!_isCrouched && !_isCrouchTransitioning))
-			{
-                _isSprinting = _input.sprint;
-            }
-			else
-			{
-				_isSprinting = false;
-			}
-            
-        }
-
-		private float CalculateTargetSpeed()
-		{
-			if (_isSprinting)
-				return SprintSpeed;
-			else if (_isCrouched || _isCrouchTransitioning)
-				return _crouchSpeed;
-			else return MoveSpeed;
-		}
-
-		private void Move()
-		{
-
-			UpdateSprintState();
-
-			// set target speed based on sprint/crouch/standing state
-			float targetSpeed = CalculateTargetSpeed();
-
-			// a simplistic acceleration and deceleration designed to be easy to remove, replace, or iterate upon
-
-			// note: Vector2's == operator uses approximation so is not floating point error prone, and is cheaper than magnitude
-			// if there is no input, set the target speed to 0
-			if (_input.move == Vector2.zero) targetSpeed = 0.0f;
-
-			// a reference to the players current horizontal velocity
-			float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
-
-			float speedOffset = 0.1f;
-			float inputMagnitude = _input.analogMovement ? _input.move.magnitude : 1f;
-
-			// accelerate or decelerate to target speed
-			if (currentHorizontalSpeed < targetSpeed - speedOffset || currentHorizontalSpeed > targetSpeed + speedOffset)
-			{
-				// creates curved result rather than a linear one giving a more organic speed change
-				// note T in Lerp is clamped, so we don't need to clamp our speed
-				_speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed * inputMagnitude, Time.deltaTime * SpeedChangeRate);
-
-				// round speed to 3 decimal places
-				_speed = Mathf.Round(_speed * 1000f) / 1000f;
-			}
-			else
-			{
-				_speed = targetSpeed;
-			}
-
-			// normalise input direction
-			Vector3 inputDirection = new Vector3(_input.move.x, 0.0f, _input.move.y).normalized;
-
-			// note: Vector2's != operator uses approximation so is not floating point error prone, and is cheaper than magnitude
-			// if there is a move input rotate player when the player is moving
-			if (_input.move != Vector2.zero)
-			{
-				// move
-				inputDirection = transform.right * _input.move.x + transform.forward * _input.move.y;
-			}
-
-			// move the player
-			_controller.Move(inputDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
-		}
-
-		private void JumpAndGravity()
-		{
-			if (Grounded)
-			{
-				// reset the fall timeout timer
-				_fallTimeoutDelta = FallTimeout;
-
-				// stop our velocity dropping infinitely when grounded
-				if (_verticalVelocity < 0.0f)
-				{
-					_verticalVelocity = -2f;
-				}
-
-
-				// the buffer timer is used to help verify instances when the player has left the ground
-				// for a minimal duration. The buffer is reset when the player touches the ground.
-				// If the buffer is reached, meaning the player has been ungrounded for a sufficient duration,
-				// then the 'OnLand' movement event is called the next time the player touches the ground
-				if (_ungroundedBufferReached)
-				{
-					OnLand?.Invoke(_landing);
-				}
-
-				// reset the ungrounded buffer's states
-				_ungroundedBufferReached = false;
-				_currentUngroundedBufferCount = 0;
-				_ungrounded = false;
-
-				// Jump
-				if (_input.jump && _jumpTimeoutDelta <= 0.0f)
-				{
-					// the square root of H * -2 * G = how much velocity needed to reach desired height
-					_verticalVelocity = Mathf.Sqrt(JumpHeight * -2f * Gravity);
-
-					//signal the jump
-					OnJump?.Invoke();
-				}
-
-				// jump timeout
-				if (_jumpTimeoutDelta >= 0.0f)
-				{
-					_jumpTimeoutDelta -= Time.deltaTime;
-				}
-			}
-			else
-			{
-				// reset the jump timeout timer
-				_jumpTimeoutDelta = JumpTimeout;
-
-				// fall timeout
-				if (_fallTimeoutDelta >= 0.0f)
-				{
-					_fallTimeoutDelta -= Time.deltaTime;
-				}
-
-				// if we are not grounded, do not jump
-				_input.jump = false;
-
-				// tick the ungrounded buffer. Used to for filtering out studder-grounding
-				if (!_ungroundedBufferReached)
-				{
-					_currentUngroundedBufferCount += Time.deltaTime;
-
-					if (_currentUngroundedBufferCount > _ungroundedBufferTime)
-					{
-						_ungroundedBufferReached = true;
-						_ungrounded = true;
-						//raise the ungrounded event
-						OnUngrounded?.Invoke();
-					}
-				}
-			}
-
-			// apply gravity over time if under terminal (multiply by delta time twice to linearly speed up over time)
-			if (_verticalVelocity < _terminalVelocity)
-			{
-				_verticalVelocity += Gravity * Time.deltaTime;
-			}
-
-			if (_verticalVelocity <= -_nastyLandingMinVelocity)
-				_landing = FootSoundType.landNasty;
-
-			else if (_verticalVelocity <= -_heavyLandingMinVelocity)
-				_landing = FootSoundType.landHeavy;
-
-			else if (_verticalVelocity <= -_moderateLandingMinVelocity)
-				_landing = FootSoundType.landModerate;
-
-			else _landing = FootSoundType.landEasy;
-		}
-
-		private void Crouch()
-		{
-			//detect for any obstructions if the crouch mechanic is working
-			if (_isCrouchTransitioning || _isCrouched)
-			{
-				_detectionDistance = _originalPlayerHeight - _controller.height;
-				Vector3 topOfPlayer = transform.position + _controller.height * Vector3.up;
-				Vector3 detectionEnd = topOfPlayer + Vector3.up * _detectionDistance;
-				Collider[] detectedColliders = Physics.OverlapCapsule(topOfPlayer, detectionEnd, _controller.radius, GroundLayers);
-
-				if (detectedColliders.Length > 0)
-				{
-                    _isUncrouchAvailable = false;
-					//Debug.Log($"Standup Unavailable: {detectedColliders.Length} colliders detected");
-                }
-				else
-				{
-					_isUncrouchAvailable = true;
-                    //Debug.Log("Overhead Cleared!");
-                }
-					
-
-			}
-
-			
-			if (!_isCrouched)
-			{
-				//start crouching if
-				//... the action is available,
-				//... the button is being pressed,
-				//... and we ARE NOT ALREADY TRANSITIONING INTO A CROUCH
-				if (_isCrouchAvailable && _input.crouch && !_isCrouchTransitioning)
-				{
-					_isCrouchTransitioning = true;
-				}
-
-				//keep transitioning into a crouch if the button is still pressed (and if we're still able to crouch) [OR IF WE SUDDENLY GOT BLOCKED]
-				if (_isCrouchTransitioning && ((_input.crouch && _isCrouchAvailable) || !_isUncrouchAvailable))
-				{
-					float newHeight = _controller.height + (-Time.deltaTime * _crouchSpeed);
-
-					//complete the crouch if we reached our desired crouch height
-					if (newHeight < _crouchHeight)
-					{
-						newHeight = _crouchHeight;
-						_isCrouchTransitioning = false;
-						_isCrouched = true;
-						OnCrouchEnter?.Invoke();
-					}
-
-					_controller.height = newHeight;
-				}
-
-				//raise back up if either 'the button got released' or 'we suddenly aren't allowed to crouch' [ALSO IF WE AREN'T BLOCKED]
-				else if (_isCrouchTransitioning && (!_input.crouch || !_isCrouchAvailable) && _isUncrouchAvailable)
-				{
-                    float newHeight = _controller.height + Time.deltaTime * _crouchSpeed;
-
-					//end the transition if we've raised back to our original height
-                    if (newHeight > _originalPlayerHeight)
-                    {
-                        newHeight = _originalPlayerHeight;
-                        _isCrouchTransitioning = false;
-                    }
-
-                    _controller.height = newHeight;
-                }
-			}
-
-			else 
-			{
-                //start raising up if
-                //... we have space to stand up,
-                //... crouch got either 'released' or 'interrupted',
-                //... and we ARE NOT ALREADY TRANSITIONING 
-                if ( _isUncrouchAvailable && (!_input.crouch || !_isCrouchAvailable)  && !_isCrouchTransitioning)
-				{
-					_isCrouchTransitioning = true;
-				}
-
-				//keep raising up if 1) we have space to stand, and 2) the player either can't crouch here or isn't pressing crouch
-				if (_isCrouchTransitioning && _isUncrouchAvailable && (!_input.crouch || !_isCrouchAvailable) )
-				{
-                    float newHeight = _controller.height + Time.deltaTime * _crouchSpeed;
-
-                    //end the transition if we've raised back to our original height
-                    if (newHeight > _originalPlayerHeight)
-                    {
-                        newHeight = _originalPlayerHeight;
-                        _isCrouchTransitioning = false;
-						_isCrouched = false;
-						OnCrouchExit?.Invoke();
-                    }
-
-                    _controller.height = newHeight;
-                }
-
-				//else lower back down into position if we got blocked or the player wants to keep crouching
-				else if (_isCrouchTransitioning && (!_isUncrouchAvailable || (_input.crouch && _isCrouchAvailable)) )
-				{
-                    float newHeight = _controller.height + (-Time.deltaTime * _crouchSpeed);
-
-                    //complete the crouch if we reached our desired crouch height
-                    if (newHeight < _crouchHeight)
-                    {
-                        newHeight = _crouchHeight;
-                        _isCrouchTransitioning = false;
-                    }
-
-                    _controller.height = newHeight;
-                }
-			}
-
-
-		}
-
-		private static float ClampAngle(float lfAngle, float lfMin, float lfMax)
-		{
-			if (lfAngle < -360f) lfAngle += 360f;
-			if (lfAngle > 360f) lfAngle -= 360f;
-			return Mathf.Clamp(lfAngle, lfMin, lfMax);
-		}
-
-        private void OnDrawGizmos()
+        private static float ClampAngle(float lfAngle, float lfMin, float lfMax)
         {
-            DrawCrouchHeightDetection();
+            if (lfAngle < -360f) lfAngle += 360f;
+            if (lfAngle > 360f) lfAngle -= 360f;
+            return Mathf.Clamp(lfAngle, lfMin, lfMax);
         }
 
-        private void OnDrawGizmosSelected()
-		{
 
-			Color transparentGreen = new Color(0.0f, 1.0f, 0.0f, 0.35f);
-			Color transparentRed = new Color(1.0f, 0.0f, 0.0f, 0.35f);
 
-			if (Grounded) Gizmos.color = transparentGreen;
-			else Gizmos.color = transparentRed;
 
-			// when selected, draw a gizmo in the position of, and matching radius of, the grounded collider
-			Gizmos.DrawSphere(new Vector3(transform.position.x, transform.position.y - GroundedOffset, transform.position.z), GroundedRadius);
-		}
-
-		private void DrawCrouchHeightDetection()
-		{
-			if (_controller != null)
-			{
+        //gizmo-related
+        private void DrawCrouchHeightDetection()
+        {
+            if (_controller != null)
+            {
                 Gizmos.color = _crouchGizmoColor;
                 Vector3 topOfPlayer = transform.position + _controller.height * Vector3.up;
                 Gizmos.DrawLine(topOfPlayer, topOfPlayer + Vector3.up * _detectionDistance);
-				
+
             }
-		}
+        }
 
-		public float GetSpeed()
-		{
-			return _speed;
-		}
 
-		public bool IsUngrounded() { return _ungrounded; }
+
+
+        //Externals
+        public float GetSpeed() { return _speed; }
+
+		public bool IsUngrounded() { return !_logicallyGrounded; }
 
 		public bool IsSprinting() { return _isSprinting; }
 
-		public bool IsForwardsPressed() { return GetComponent<StarterAssetsInputs>().move.y == 1; }
+		public bool IsForwardsPressed() { return _input.move.y == 1; }
 
 		public bool IsCrouched() { return _isCrouched; }
 		public bool IsCrouchTransitioning() { return _isCrouchTransitioning; }
