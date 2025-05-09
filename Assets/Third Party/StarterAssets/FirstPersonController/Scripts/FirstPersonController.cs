@@ -5,18 +5,52 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 #endif
 
+
+
+public enum MovementState
+{
+    Unset,
+    General,
+    Climbing
+}
+
 namespace StarterAssets
 {
 	[RequireComponent(typeof(CharacterController))]
 #if ENABLE_INPUT_SYSTEM
 	[RequireComponent(typeof(PlayerInput))]
 #endif
+
+
+
 	public class FirstPersonController : MonoBehaviour
 	{
-		[Header("Player")]
-		[Tooltip("Move speed of the character in m/s")]
-		public float MoveSpeed = 4.0f;
-		public float _cameraHeightTransitionSpeed = 2.0f;
+        [Header("Core Movement")]
+        [SerializeField] private MovementState _movementState = MovementState.Unset;
+        [SerializeField] private float _moveSpeed = 4.0f;
+        [SerializeField] private float _sprintSpeed = 6.0f;
+        [SerializeField] private bool _isSprinting = false;
+        [SerializeField] private bool _isSprintAvailable = true;
+        [Tooltip("Rotation speed of the character")]
+        [SerializeField] private float _rotationSpeed = 1.0f;
+        [Tooltip("Acceleration and deceleration")]
+        [SerializeField] private float _speedChangeRate = 10.0f;
+        private Vector3 _moveDirection;
+        private float _speed;
+        private float _rotationVelocity;
+
+        [Header("Parkour")]
+        [SerializeField] LedgeDetectionManager _ledgeDetectManager;
+        [Tooltip("Is the climbing mechanic enabled for the player to use")]
+        [SerializeField] private bool _isClimbEnabled = true;
+        [Tooltip("Is the player within a valid context to climb")]
+        [SerializeField] private bool _isClimbAvailable = false;
+        [SerializeField] private LedgeType _detectedLedgeType = LedgeType.unset;
+        [SerializeField] private Vector3 _ledgePosition;
+
+
+        [Header("Crouching")]
+        [SerializeField] private float _cameraHeightTransitionSpeed = 2.0f;
         [SerializeField] private bool _isCrouched = false;
         private bool _isCrouchTransitioning = false;
         private float _originalPlayerHeight;
@@ -25,59 +59,61 @@ namespace StarterAssets
         [SerializeField] private bool _isUncrouchAvailable = true;
         [SerializeField] private float _crouchCastTweak;
         [SerializeField] private DrawRectGizmo _crouchGizmo;
-        private float _detectionDistance;
-        [Tooltip("Sprint speed of the character in m/s")]
-		public float SprintSpeed = 6.0f;
-		[SerializeField] private bool _isSprinting = false;
-		[SerializeField] private bool _isSprintAvailable = true;
-		[Tooltip("Rotation speed of the character")]
-		public float RotationSpeed = 1.0f;
-		[Tooltip("Acceleration and deceleration")]
-		public float SpeedChangeRate = 10.0f;
 
-		[Space(10)]
-		[Tooltip("The height the player can jump")]
-		public float JumpHeight = 1.2f;
-		[Tooltip("The character uses its own gravity value. The engine default is -9.81f")]
-		public float Gravity = -15.0f;
 
-		[Space(10)]
-		[Tooltip("Time required to pass before being able to jump again. Set to 0f to instantly jump again")]
-		public float JumpTimeout = 0.1f;
-		[Tooltip("If the jump timeout has completed")]
-		[SerializeField] private bool _jumpTimeoutCompleted = true;
-		[Tooltip("Time required to pass before entering the fall state. Useful for walking down stairs or across uneven terrain")]
-		public float FallTimeout = 0.15f;
+        [Header("Jumping & Falling")]
+        [Tooltip("The height the player can jump")]
+        [SerializeField] private float _jumpHeight = 1.2f;
+        [Tooltip("The character uses its own gravity value. The engine default is -9.81f")]
+        [SerializeField] private float _gravity = -15.0f;
+        [Tooltip("Time required to pass before being able to jump again. Set to 0f to instantly jump again")]
+        [SerializeField] private float _jumpTimeout = 0.1f;
+        [Tooltip("If the jump timeout has completed")]
+        [SerializeField] private bool _jumpTimeoutCompleted = true;
+        [Tooltip("Time required to pass before entering the fall state. Useful for walking down stairs or across uneven terrain")]
+        [SerializeField] private float _fallTimeout = 0.15f;
         [Tooltip("If the character has been falling for long enough to be considered No Longer Grounded")]
         [SerializeField] private bool _fallTimeoutCompleted = false;
-        [Header("Player Grounded")]
-		[Tooltip("If the character is physically touching the ground or not at this instance. " +
-				"Not part of the CharacterController built in grounded check. " +
-				"Also doesn't consider the fallout timer.")]
-		[SerializeField] private bool _literallyGrounded = true;
-		[Tooltip("If the character is considered to be grounded AFTER considering the fallout timer. " +
-			"This is the functional grounded state, and this state is returned to other scripts")]
-		[SerializeField] private bool _logicallyGrounded = true;
-		
-        
+        private float _jumpTimeoutDelta;
+        private float _fallTimeoutDelta;
+        private float _verticalVelocity;
+        private float _terminalVelocity = 53.0f;
+        [SerializeField] private FootSoundType _landing = FootSoundType.landEasy;
+        [SerializeField] private float _moderateLandingMinVelocity = 5f;
+        [SerializeField] private float _heavyLandingMinVelocity = 9f;
+        [SerializeField] private float _nastyLandingMinVelocity = 15f;
+
+        [Space(10)]
+        [Tooltip("If the character is physically touching the ground or not at this instance. " +
+                "Not part of the CharacterController built in grounded check. " +
+                "Also doesn't consider the fallout timer.")]
+        [SerializeField] private bool _literallyGrounded = true;
+        [Tooltip("If the character is considered to be grounded AFTER considering the fallout timer. " +
+            "This is the functional grounded state, and this state is returned to other scripts")]
+        [SerializeField] private bool _logicallyGrounded = true;
         [Tooltip("Useful for rough ground")]
-		public float GroundedOffset = -0.14f;
-		[Tooltip("The radius of the grounded check. Should match the radius of the CharacterController")]
-		public float GroundedRadius = 0.5f;
-		[Tooltip("What layers the character uses as ground")]
-		public LayerMask GroundLayers;
+        [SerializeField] private float _groundedOffset = -0.14f;
+        [Tooltip("The radius of the grounded check. Should match the radius of the CharacterController")]
+        [SerializeField] private float _groundedRadius = 0.5f;
+        [Tooltip("What layers the character uses as ground")]
+        [SerializeField] private LayerMask _groundLayers;
 
 
+        
+        
 
-        [Header("Cinemachine")]
+
+        [Header("Camera Settings")]
         [SerializeField] private Transform _playerCameraRoot;
         [SerializeField] private Transform _camRootParent;
 		[Tooltip("The follow target set in the Cinemachine Virtual Camera that the camera will follow")]
 		public GameObject CinemachineCameraTarget;
 		[Tooltip("How far in degrees can you move the camera up")]
-		public float TopClamp = 90.0f;
+		[SerializeField] private float TopClamp = 90.0f;
 		[Tooltip("How far in degrees can you move the camera down")]
-		public float BottomClamp = -90.0f;
+		[SerializeField] private float BottomClamp = -90.0f;
+        private float _cinemachineTargetPitch;
+        private const float _threshold = 0.01f;
 
 
         [Header("Gizmo Settings")]
@@ -85,40 +121,20 @@ namespace StarterAssets
         [SerializeField] private Color _missColor;
 
 
-		// cinemachine
-		private float _cinemachineTargetPitch;
 
-		// player
-		private Vector3 _moveDirection;
-		private float _speed;
-		private float _rotationVelocity;
-		[Header("Fall heights")]
-		[SerializeField]private float _verticalVelocity;
-		private float _terminalVelocity = 53.0f;
-		[SerializeField] private FootSoundType _landing = FootSoundType.landEasy;
-		[SerializeField] private float _moderateLandingMinVelocity = 5f;
-		[SerializeField] private float _heavyLandingMinVelocity = 9f;
-		[SerializeField] private float _nastyLandingMinVelocity = 15f;
-
-
-		// timers & time flags
-		private float _jumpTimeoutDelta;
-		private float _fallTimeoutDelta;
-		private bool _jumpTriggered = false;
-
-
-
-
+        //references
 #if ENABLE_INPUT_SYSTEM
         private PlayerInput _playerInput;
 #endif
 		private CharacterController _controller;
 		private StarterAssetsInputs _input;
 		private GameObject _mainCamera;
+        
 
-		private const float _threshold = 0.01f;
+		
 
 
+        //events
 		public delegate void MovementEvent();
 		public delegate void LandEvent(FootSoundType landingType);
 		public event LandEvent OnLand;
@@ -128,7 +144,6 @@ namespace StarterAssets
 		public event MovementEvent OnRunExit;
 		public event MovementEvent OnCrouchEnter;
 		public event MovementEvent OnCrouchExit;
-
 
 
 		//optional Compiles
@@ -143,6 +158,9 @@ namespace StarterAssets
 				#endif
 			}
 		}
+
+
+
 
 
 		//monobehaviours
@@ -166,13 +184,28 @@ namespace StarterAssets
 #endif
 
 			// reset our timeouts on start
-			_jumpTimeoutDelta = JumpTimeout;
-			_fallTimeoutDelta = FallTimeout;
+			_jumpTimeoutDelta = _jumpTimeout;
+			_fallTimeoutDelta = _fallTimeout;
 
+            // track our expected height
 			_originalPlayerHeight = _controller.height;
+
+            //setup other initial states
+            _movementState = MovementState.General;
+            _ledgePosition = Vector3.zero;
 		}
 
-		private void Update()
+        private void OnEnable()
+        {
+            _ledgeDetectManager.OnLedgeDetected += ListenForAvailableLedges;
+        }
+
+        private void OnDisable()
+        {
+            _ledgeDetectManager.OnLedgeDetected -= ListenForAvailableLedges;
+        }
+
+        private void Update()
 		{
 			DetermineCharacterStates();
 			ApplyVelocities();
@@ -185,14 +218,10 @@ namespace StarterAssets
 			CameraRotation();
         }
 
-
-        private void OnDrawGizmos()
-        {
-            DrawUncrouchAvailability();
-        }
-
         private void OnDrawGizmosSelected()
         {
+
+            DrawUncrouchAvailability();
 
             Color transparentGreen = new Color(0.0f, 1.0f, 0.0f, 0.35f);
             Color transparentRed = new Color(1.0f, 0.0f, 0.0f, 0.35f);
@@ -201,28 +230,41 @@ namespace StarterAssets
             else Gizmos.color = transparentRed;
 
             // when selected, draw a gizmo in the position of, and matching radius of, the grounded collider
-            Gizmos.DrawSphere(new Vector3(transform.position.x, transform.position.y - GroundedOffset, transform.position.z), GroundedRadius);
+            Gizmos.DrawSphere(new Vector3(transform.position.x, transform.position.y - _groundedOffset, transform.position.z), _groundedRadius);
         }
 
 
 
         //internals
+        private void ListenForAvailableLedges(LedgeType type, Vector3 position)
+        {
+            _detectedLedgeType = type;
+            _ledgePosition = position;
+        }
+
 		private void DetermineCharacterStates()
 		{
-			UpdateGroundedStates();
-			UpdateSprintState();
-			UpdateLandingSound();
-			Crouch();
-            UpdateCameraHeight();
-            
-			
+            if ( _movementState == MovementState.General)
+            {
+                UpdateGroundedStates();
+                UpdateSprintState();
+                UpdateLandingSound();
+                Crouch();
+                UpdateCameraHeight();
+                DetermineClimbAvailability();
+                EnterClimb();
+            }
+            else if (_movementState == MovementState.Climbing)
+            {
+                Climb();
+            }
 		}
 
         private void UpdateGroundedStates()
 		{
 			// set sphere position, with offset
-			Vector3 spherePosition = new Vector3(transform.position.x, transform.position.y - GroundedOffset, transform.position.z);
-			_literallyGrounded = Physics.CheckSphere(spherePosition, GroundedRadius, GroundLayers, QueryTriggerInteraction.Ignore);
+			Vector3 spherePosition = new Vector3(transform.position.x, transform.position.y - _groundedOffset, transform.position.z);
+			_literallyGrounded = Physics.CheckSphere(spherePosition, _groundedRadius, _groundLayers, QueryTriggerInteraction.Ignore);
 
             if (_literallyGrounded)
             {
@@ -235,7 +277,7 @@ namespace StarterAssets
                 }
 
                 // reset the fall timeout timer
-                _fallTimeoutDelta = FallTimeout;
+                _fallTimeoutDelta = _fallTimeout;
 
                 
             }
@@ -289,7 +331,7 @@ namespace StarterAssets
             {
                 Vector3 playerMiddle = transform.position + Vector3.up * (_originalPlayerHeight / 2 + 0.01f);
                 Vector3 castSize = new Vector3((_controller.radius + _crouchCastTweak ) / 2, (_originalPlayerHeight) / 2, (_controller.radius + _crouchCastTweak) / 2);
-                Collider[] detectedColliders = Physics.OverlapBox(playerMiddle, castSize, transform.rotation, GroundLayers);
+                Collider[] detectedColliders = Physics.OverlapBox(playerMiddle, castSize, transform.rotation, _groundLayers);
 
                 if (detectedColliders.Length > 0)
                 {
@@ -324,6 +366,37 @@ namespace StarterAssets
             }
 
         }
+        private void DetermineClimbAvailability()
+        {
+            if ( _isClimbEnabled)
+            {
+                //are we sprinting(while grounded) or are we Falling? WHILE NOT ALREADY CLIMBING
+                if ( (_isSprinting && _logicallyGrounded || !_logicallyGrounded && _verticalVelocity < 0) && _movementState != MovementState.Climbing)
+                {
+                    _isClimbAvailable = true;
+                }
+                else
+                {
+                    _isClimbAvailable = false;
+                }
+            }
+            else
+                _isClimbAvailable = false;
+             
+        }
+
+        private void EnterClimb()
+        {
+            if (_isClimbAvailable && _ledgeDetectManager.IsLedgeStillValid(_detectedLedgeType, _ledgePosition))
+            {
+                Debug.Log("Pretend we entered the climb state");
+            }
+        }
+
+        private void Climb()
+        {
+
+        }
 
 
 
@@ -331,10 +404,14 @@ namespace StarterAssets
 
         private void ApplyVelocities()
 		{
-			ApplyGravity();
-			ApplyHorizontalMovement();
-			ManageJump();
-			CalculateMoveDirection();
+            if (_movementState == MovementState.General)
+            {
+                ApplyGravity();
+                ApplyHorizontalMovement();
+                ManageJump();
+                CalculateMoveDirection();
+            }
+			
 		}
         private void ApplyGravity()
         {
@@ -352,7 +429,7 @@ namespace StarterAssets
                 // apply gravity over time if under terminal (multiply by delta time twice to linearly speed up over time)
                 if (_verticalVelocity < _terminalVelocity)
                 {
-                    _verticalVelocity += Gravity * Time.deltaTime;
+                    _verticalVelocity += _gravity * Time.deltaTime;
                 }
 
             }
@@ -379,7 +456,7 @@ namespace StarterAssets
             {
                 // creates curved result rather than a linear one giving a more organic speed change
                 // note T in Lerp is clamped, so we don't need to clamp our speed
-                _speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed * inputMagnitude, Time.deltaTime * SpeedChangeRate);
+                _speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed * inputMagnitude, Time.deltaTime * _speedChangeRate);
 
                 // round speed to 3 decimal places
                 _speed = Mathf.Round(_speed * 1000f) / 1000f;
@@ -396,10 +473,10 @@ namespace StarterAssets
         private float CalculateTargetSpeed()
         {
             if (_isSprinting)
-                return SprintSpeed;
+                return _sprintSpeed;
             else if (_isCrouched || _isCrouchTransitioning)
                 return _cameraHeightTransitionSpeed;
-            else return MoveSpeed;
+            else return _moveSpeed;
         }
         private void ManageJump()
         {
@@ -412,7 +489,7 @@ namespace StarterAssets
                     _jumpTimeoutCompleted = false;
 
                     // the square root of H * -2 * G = how much velocity needed to reach desired height
-                    _verticalVelocity = Mathf.Sqrt(JumpHeight * -2f * Gravity);
+                    _verticalVelocity = Mathf.Sqrt(_jumpHeight * -2f * _gravity);
 
                     //signal the jump
                     OnJump?.Invoke();
@@ -430,7 +507,7 @@ namespace StarterAssets
                         if (_jumpTimeoutDelta <= 0)
                         {
                             _jumpTimeoutCompleted = true;
-                            _jumpTimeoutDelta = JumpTimeout;
+                            _jumpTimeoutDelta = _jumpTimeout;
                         }
                     }
                 }
@@ -458,7 +535,8 @@ namespace StarterAssets
 
         private void MoveCharacter()
 		{
-            _controller.Move(_moveDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+            if (_movementState == MovementState.General)
+                _controller.Move(_moveDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
         }
 
 
@@ -472,8 +550,8 @@ namespace StarterAssets
 				//Don't multiply mouse input by Time.deltaTime
 				float deltaTimeMultiplier = IsCurrentDeviceMouse ? 1.0f : Time.deltaTime;
 				
-				_cinemachineTargetPitch += _input.look.y * RotationSpeed * deltaTimeMultiplier;
-				_rotationVelocity = _input.look.x * RotationSpeed * deltaTimeMultiplier;
+				_cinemachineTargetPitch += _input.look.y * _rotationSpeed * deltaTimeMultiplier;
+				_rotationVelocity = _input.look.x * _rotationSpeed * deltaTimeMultiplier;
 
 				// clamp our pitch rotation
 				_cinemachineTargetPitch = ClampAngle(_cinemachineTargetPitch, BottomClamp, TopClamp);
