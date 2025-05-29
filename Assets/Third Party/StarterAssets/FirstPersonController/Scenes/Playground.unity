@@ -189,6 +189,7 @@ Transform:
   m_Children:
   - {fileID: 886609078}
   - {fileID: 530562866}
+  - {fileID: 1416831237}
   m_Father: {fileID: 841002482}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &59370332
@@ -204,7 +205,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ShowGizmo: 1
-  _color: {r: 0.5660378, g: 0.5660378, b: 0.5660378, a: 0}
+  _color: {r: 0.100138426, g: 1, b: 0, a: 1}
   _size: {x: 0.75, y: 1, z: 1}
 --- !u!114 &59370333
 MonoBehaviour:
@@ -228,7 +229,7 @@ MonoBehaviour:
   _ledgeCastSize: {x: 0.75, y: 0.05, z: 1}
   _minimalOpenSpaceSize: {x: 0.25, y: 0.25, z: 0.25}
   _maxLedgeDistanceFromDetector: 0.5
-  _showPositionGizmo: 0
+  _showPositionGizmo: 1
   _runtimeLedgeCastColor: {r: 0, g: 0, b: 0, a: 0}
   _validOpeningColor: {r: 0, g: 0.60495615, b: 1, a: 1}
   _invalidOpeningColor: {r: 0, g: 0, b: 0, a: 0}
@@ -491,7 +492,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ShowGizmo: 1
-  _color: {r: 0.5660378, g: 0.5660378, b: 0.5660378, a: 0}
+  _color: {r: 0.9716981, g: 0, b: 0, a: 1}
   _size: {x: 0.75, y: 0.5, z: 1}
 --- !u!114 &242430386
 MonoBehaviour:
@@ -515,7 +516,7 @@ MonoBehaviour:
   _ledgeCastSize: {x: 0.75, y: 0.05, z: 1}
   _minimalOpenSpaceSize: {x: 0.25, y: 0.25, z: 0.25}
   _maxLedgeDistanceFromDetector: 0.5
-  _showPositionGizmo: 0
+  _showPositionGizmo: 1
   _runtimeLedgeCastColor: {r: 0, g: 0, b: 0, a: 0}
   _validOpeningColor: {r: 0.038573146, g: 1, b: 0, a: 1}
   _invalidOpeningColor: {r: 0, g: 0, b: 0, a: 0}
@@ -1227,7 +1228,7 @@ MonoBehaviour:
   _midDetectionSize: {x: 0.75, y: 0.5, z: 1}
   _lowLedgeDetectionCenter: {fileID: 1635318382}
   _lowDetector: {fileID: 1635318384}
-  _lowDetectionSize: {x: 0.75, y: 0.5, z: 1}
+  _lowDetectionSize: {x: 0.75, y: 0.6, z: 1}
   _isDetectionActive: 1
   _inactiveColor: {r: 0.5660378, g: 0.5660378, b: 0.5660378, a: 0}
   _missColor: {r: 0.5754717, g: 0.5754717, b: 0.5754717, a: 1}
@@ -2202,6 +2203,37 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1403747792}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1416831236
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1416831237}
+  m_Layer: 7
+  m_Name: wall hang offset origin
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1416831237
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1416831236}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 59370331}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1468928752
 GameObject:
   m_ObjectHideFlags: 0
@@ -2232,37 +2264,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 719680413}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1553711411
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1553711412}
-  m_Layer: 7
-  m_Name: Ledge Detection
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!4 &1553711412
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1553711411}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 2.75, z: 0.5}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 3893294199639930361}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1561300431
 GameObject:
@@ -2402,7 +2403,7 @@ Transform:
   m_GameObject: {fileID: 1635318381}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.75, z: 0.7}
+  m_LocalPosition: {x: 0, y: 0.7, z: 0.7}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -2423,7 +2424,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ShowGizmo: 1
-  _color: {r: 0.5660378, g: 0.5660378, b: 0.5660378, a: 0}
+  _color: {r: 0.5647059, g: 0.5647059, b: 0.5647059, a: 1}
   _size: {x: 0.75, y: 0.5, z: 1}
 --- !u!114 &1635318384
 MonoBehaviour:
@@ -2447,7 +2448,7 @@ MonoBehaviour:
   _ledgeCastSize: {x: 0.75, y: 0.05, z: 1}
   _minimalOpenSpaceSize: {x: 0.25, y: 0.25, z: 0.25}
   _maxLedgeDistanceFromDetector: 0.5
-  _showPositionGizmo: 0
+  _showPositionGizmo: 1
   _runtimeLedgeCastColor: {r: 0, g: 0, b: 0, a: 0}
   _validOpeningColor: {r: 0.96575654, g: 1, b: 0, a: 1}
   _invalidOpeningColor: {r: 0, g: 0, b: 0, a: 0}
@@ -3636,7 +3637,6 @@ Transform:
   - {fileID: 2254075148441306735}
   - {fileID: 3055624215887834185}
   - {fileID: 841002482}
-  - {fileID: 1553711412}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4416926083347132227
@@ -3687,6 +3687,15 @@ MonoBehaviour:
   _isClimbAvailable: 0
   _detectedLedgeType: 0
   _ledgePosition: {x: 0, y: 0, z: 0}
+  _transitionType: 0
+  _transitionEndPoint: {x: -Infinity, y: -Infinity, z: -Infinity}
+  _transitionDuration: 0.25
+  _wallHangOffsetOrigin: {fileID: 1416831237}
+  _enterHangDuration: 0.2
+  _wallHangInputDelay: 0.2
+  _isWallHanging: 0
+  _isHighGrabReady: 1
+  _highGrabCooldownDuration: 1
   _cameraHeightTransitionSpeed: 2
   _isCrouched: 0
   _crouchHeight: 1

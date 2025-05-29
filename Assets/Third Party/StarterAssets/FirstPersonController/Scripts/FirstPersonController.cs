@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Net;
 using TMPro;
+using TreeEditor;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -45,8 +47,31 @@ namespace StarterAssets
         [SerializeField] private bool _isClimbEnabled = true;
         [Tooltip("Is the player within a valid context to climb")]
         [SerializeField] private bool _isClimbAvailable = false;
+        [Space(10)]
         [SerializeField] private LedgeType _detectedLedgeType = LedgeType.unset;
         [SerializeField] private Vector3 _ledgePosition;
+        [Space(10)]
+        [SerializeField] private LedgeType _transitionType = LedgeType.unset;
+        [SerializeField] private Vector3 _transitionEndPoint = Vector3.negativeInfinity;
+        [SerializeField] private float _transitionDuration = 1f;
+        private float _currentTransitionTime = 0;
+        private Vector3 _transitionStartPoint;
+        [Space(10)]
+        [Tooltip("The point the player is offset from to emulate wall hanging. " +
+            "This point will be aligned with the ledge point when a high grab occurs")]
+        [SerializeField] private Transform _wallHangOffsetOrigin;
+        private Vector3 _vectorFromWallHangOriginToHighLedge;
+        [SerializeField] private float _enterHangDuration = .2f;
+        [Tooltip("A buffer time before reading the player's next Input after entering a wall hang")]
+        [SerializeField] private float _wallHangInputDelay = .2f;
+        private bool _isWallHangInputDelayComplete = true;
+        private float _currentEnterHangTime = 0;
+        [SerializeField]private bool _isWallHanging = false;
+        private bool _isClimbingOver = false;
+        [SerializeField] private bool _isHighGrabReady = true;
+        [SerializeField] private float _highGrabCooldownDuration = .33f;
+
+
 
 
         [Header("Crouching")]
@@ -209,11 +234,20 @@ namespace StarterAssets
 		{
 			DetermineCharacterStates();
 			ApplyVelocities();
-			MoveCharacter();
+            if (_movementState == MovementState.General)
+			    MoveCharacter();
 			
 		}
 
-		private void LateUpdate()
+        private void FixedUpdate()
+        {
+            if (_movementState == MovementState.Climbing)
+            {
+                Climb();
+            }
+        }
+
+        private void LateUpdate()
 		{
 			CameraRotation();
         }
@@ -253,10 +287,6 @@ namespace StarterAssets
                 UpdateCameraHeight();
                 DetermineClimbAvailability();
                 EnterClimb();
-            }
-            else if (_movementState == MovementState.Climbing)
-            {
-                Climb();
             }
 		}
 
@@ -371,7 +401,7 @@ namespace StarterAssets
             if ( _isClimbEnabled)
             {
                 //are we sprinting(while grounded) or are we Falling? WHILE NOT ALREADY CLIMBING
-                if ( (_isSprinting && _logicallyGrounded || !_logicallyGrounded && _verticalVelocity < 0) && _movementState != MovementState.Climbing)
+                if ( (_isSprinting && _logicallyGrounded && _input.move.y == 1 || !_logicallyGrounded && _verticalVelocity < 0) && _movementState != MovementState.Climbing)
                 {
                     _isClimbAvailable = true;
                 }
@@ -389,13 +419,186 @@ namespace StarterAssets
         {
             if (_isClimbAvailable && _ledgeDetectManager.IsLedgeStillValid(_detectedLedgeType, _ledgePosition))
             {
-                Debug.Log("Pretend we entered the climb state");
+                //DONT enter climb if the ledge is high and the highGrab cooldown isn't complete
+                if (_detectedLedgeType == LedgeType.high && !_isHighGrabReady)
+                    return;
+
+
+                //Disable Ledge Detection temporarily
+                _ledgeDetectManager.enabled = false;
+
+                //Change the movement state
+                _movementState = MovementState.Climbing;
+
+                //specify the transition state
+                _transitionType = _detectedLedgeType;
+                _transitionStartPoint = transform.position;
+                _transitionEndPoint = _ledgePosition;
+
+                //Clear any velocity utils
+                _controller.SimpleMove(Vector3.zero);
+                _controller.enabled = false;
+
+                //reset the transition timer
+                _currentTransitionTime = 0;
+                
+                if (_detectedLedgeType == LedgeType.high)
+                {
+                    SetupLedgeGrab();
+                }
+
+
             }
+        }
+
+        private void SetupLedgeGrab()
+        {
+            //Calculate the offset from our set wallHangPosition to the detected ledge point
+            _vectorFromWallHangOriginToHighLedge = _ledgePosition - _wallHangOffsetOrigin.position;
+
+            _isWallHanging = false;
+            _currentEnterHangTime = 0;
+
+            _isWallHangInputDelayComplete = false;
+            Invoke(nameof(CompleteWallHangInputDelay), _wallHangInputDelay + _enterHangDuration); //start the delay AFTER the enterWallHang transition completes
+        }
+
+        private void CompleteWallHangInputDelay()
+        {
+            _isWallHangInputDelayComplete = true;
         }
 
         private void Climb()
         {
+            //low ledge transition
+            if (_transitionType == LedgeType.low)
+            {
+                if (transform.position != _transitionEndPoint)
+                {
+                    MoveUpAndOver();
+                }
+                else
+                {
+                    _movementState = MovementState.General;
+                    _transitionType = LedgeType.unset;
+                    _transitionStartPoint = Vector3.negativeInfinity;
+                    _transitionEndPoint = Vector3.negativeInfinity;
+                    _controller.enabled = true;
+                    _ledgeDetectManager.enabled = true;
+                }
+            }
 
+            //mid ledge transisiton
+            else if (_transitionType == LedgeType.mid)
+            {
+                if (transform.position != _transitionEndPoint)
+                {
+                    MoveUpAndOver();
+                }
+                else
+                {
+                    _movementState = MovementState.General;
+                    _transitionType = LedgeType.unset;
+                    _transitionStartPoint = Vector3.negativeInfinity;
+                    _transitionEndPoint = Vector3.negativeInfinity;
+                    _controller.enabled = true;
+                    _ledgeDetectManager.enabled = true;
+                }
+            }
+
+            //high ledge transition
+            else if (_transitionType == LedgeType.high)
+            {
+
+                if (_isWallHanging == false)
+                {
+                    _currentEnterHangTime += Time.deltaTime;
+
+                    //move the player into the hanging position
+                    Vector3.Lerp(_transitionStartPoint, _transitionStartPoint + _vectorFromWallHangOriginToHighLedge, _currentEnterHangTime / _enterHangDuration);
+
+                    if (_currentEnterHangTime >= _enterHangDuration)
+                    {
+                        _currentEnterHangTime = 0;
+                        _isWallHanging = true;
+                    }
+                }
+                else
+                {
+                    //climb over if the player already triggered the climb over
+                    if (_isClimbingOver)
+                    {
+                        if (transform.position != _transitionEndPoint)
+                            MoveUpAndOver();
+                        else
+                        {
+                            _isWallHanging = false;
+
+                            //trigger highgrab cooldown
+                            Invoke(nameof(ReadyHighGrabCooldown), _highGrabCooldownDuration);
+
+                            //leave the climbing state and fall
+                            _movementState = MovementState.General;
+                            _transitionType = LedgeType.unset;
+                            _transitionStartPoint = Vector3.negativeInfinity;
+                            _transitionEndPoint = Vector3.negativeInfinity;
+                            _controller.enabled = true;
+                            _ledgeDetectManager.enabled = true;
+                        }
+                    }
+
+                    //if hanging and the player moves backwards
+                    if (_input.move.y < 0 && _input.sprint && _isWallHangInputDelayComplete)
+                    {
+                        _isWallHanging = false;
+
+                        //trigger highgrab cooldown
+                        Invoke(nameof(ReadyHighGrabCooldown),_highGrabCooldownDuration);
+
+                        //leave the climbing state and fall
+                        _movementState = MovementState.General;
+                        _transitionType = LedgeType.unset;
+                        _transitionStartPoint = Vector3.negativeInfinity;
+                        _transitionEndPoint = Vector3.negativeInfinity;
+                        _controller.enabled = true;
+                        _ledgeDetectManager.enabled = true;
+                    } 
+
+                    //if hanging and the player moves forwards
+                    else if (_input.move.y > 0 && _input.sprint && _isWallHangInputDelayComplete)
+                    {
+                        _isClimbingOver = true;
+                    }
+
+                }
+                
+            }
+        }
+
+        private void ReadyHighGrabCooldown()
+        {
+            _isHighGrabReady = true;
+        }
+
+        private void MoveUpAndOver()
+        {
+            _currentTransitionTime += Time.deltaTime;
+            Vector3 MidwayPoint = new Vector3(_transitionStartPoint.x, _transitionEndPoint.y, _transitionStartPoint.z);
+
+
+            //go over the necessary y distance for the first half of the duration
+            if (_currentTransitionTime < _transitionDuration/2)
+            {
+                transform.position = Vector3.Lerp(_transitionStartPoint, MidwayPoint, _currentTransitionTime / (_transitionDuration / 2));
+            }
+
+            //go over the remaining xz plane
+            else
+            {
+                transform.position = Vector3.Lerp(MidwayPoint, _transitionEndPoint, _currentTransitionTime / _transitionDuration);
+            }
+
+            
         }
 
 
