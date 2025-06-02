@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class CamDisplacer : MonoBehaviour
 {
@@ -12,6 +13,7 @@ public class CamDisplacer : MonoBehaviour
     [SerializeField] private CinemachineVirtualCamera _virtualCamera;
     [SerializeField] private Transform _cameraRoot;
     [SerializeField] private FirstPersonController _playerController;
+    private StarterAssetsInputs _input;
 
     [Header("Head movement on Sprint")]
     [Tooltip("Off by default. May cause motion sickness.")]
@@ -42,6 +44,8 @@ public class CamDisplacer : MonoBehaviour
     {
         _originalLocalPosition = _cameraRoot.transform.localPosition;
         _3rdPersonfollowComponent = _virtualCamera.GetCinemachineComponent<Cinemachine3rdPersonFollow>();
+
+        _input = GetComponent<StarterAssetsInputs>();
     }
 
     private void OnEnable()
@@ -174,6 +178,7 @@ public class CamDisplacer : MonoBehaviour
                 CancelScreenShake();
         }
     }
+
     private void DisplaceCam()
     {
         float randomDisplacementX = Random.Range(-_displacementStrength.x, _displacementStrength.x);
@@ -181,7 +186,6 @@ public class CamDisplacer : MonoBehaviour
         Vector3 randomDisplacement = new Vector3(randomDisplacementX, randomDisplacementY, _originalLocalPosition.z);
         _cameraRoot.localPosition = _originalLocalPosition + randomDisplacement;
     }
-
     private void CancelScreenShake()
     {
         _currentShakeTime = 0;
@@ -190,6 +194,7 @@ public class CamDisplacer : MonoBehaviour
         _isScreenShaking = false;
     }
 
+
     private void ShakeScreenOnHardLandings(FootSoundType landing)
     {
         if (landing == FootSoundType.landModerate)
@@ -197,6 +202,7 @@ public class CamDisplacer : MonoBehaviour
         else if (landing == FootSoundType.landHeavy || landing == FootSoundType.landNasty)
             ShakeScreen(0.03f, _defaultDisplacementRange.magnitude * 2);
     }
+
 
 
     //externals

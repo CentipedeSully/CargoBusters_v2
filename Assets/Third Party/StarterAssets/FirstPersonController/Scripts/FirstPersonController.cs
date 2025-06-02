@@ -56,20 +56,35 @@ namespace StarterAssets
         [SerializeField] private float _transitionDuration = 1f;
         private float _currentTransitionTime = 0;
         private Vector3 _transitionStartPoint;
+
+        //Wall Hanging
         [Space(10)]
         [Tooltip("The point the player is offset from to emulate wall hanging. " +
             "This point will be aligned with the ledge point when a high grab occurs")]
         [SerializeField] private Transform _wallHangOffsetOrigin;
+        [Tooltip("The vector that guides the player into a wall hang ")]
         private Vector3 _vectorFromWallHangOriginToHighLedge;
+        [Tooltip("The player's origin while wall hanging")]
+        private Vector3 _originalHangPosition;
+        [Tooltip("How long transitioning into a wall hanging state should take")]
         [SerializeField] private float _enterHangDuration = .2f;
         [Tooltip("A buffer time before reading the player's next Input after entering a wall hang")]
         [SerializeField] private float _wallHangInputDelay = .2f;
         private bool _isWallHangInputDelayComplete = true;
         private float _currentEnterHangTime = 0;
+        [Tooltip("Is the player hanging from a ledge?")]
         [SerializeField]private bool _isWallHanging = false;
         private bool _isClimbingOver = false;
+        [Tooltip("Is the player ready to grab high ledges? This enters a cooldown when the player releases a ledge")]
         [SerializeField] private bool _isHighGrabReady = true;
+        [Tooltip("How long the system waits before reenabling the player's ledge grab ability")]
         [SerializeField] private float _highGrabCooldownDuration = .33f;
+        [Tooltip("How long the player takes to Peek over the ledge")]
+        [SerializeField] private float _peekDuration = .33f;
+        [Tooltip("How high the player lifts to peek over a ledge")]
+        [SerializeField] private float _peekOffset = 1;
+        private float _currentPeekTime = 0;
+        private float _currentPeekOffset = 0;
 
 
 
@@ -169,6 +184,9 @@ namespace StarterAssets
 		public event MovementEvent OnRunExit;
 		public event MovementEvent OnCrouchEnter;
 		public event MovementEvent OnCrouchExit;
+
+        public event MovementEvent OnWallHangEntered;
+        public event MovementEvent OnWallHangExited;
 
 
 		//optional Compiles
@@ -459,13 +477,15 @@ namespace StarterAssets
             _isWallHanging = false;
             _currentEnterHangTime = 0;
 
+            //reset the input delay setting, to avoid unintended, auto ledge climbing
             _isWallHangInputDelayComplete = false;
-            Invoke(nameof(CompleteWallHangInputDelay), _wallHangInputDelay + _enterHangDuration); //start the delay AFTER the enterWallHang transition completes
+            
         }
 
         private void CompleteWallHangInputDelay()
         {
             _isWallHangInputDelayComplete = true;
+            //Debug.Log($"Input Delay Completed: Waited {_wallHangInputDelay} seconds");
         }
 
         private void Climb()
@@ -509,18 +529,24 @@ namespace StarterAssets
             //high ledge transition
             else if (_transitionType == LedgeType.high)
             {
-
+                //transition into the wall hanging state first, before anything else
                 if (_isWallHanging == false)
                 {
                     _currentEnterHangTime += Time.deltaTime;
 
                     //move the player into the hanging position
-                    Vector3.Lerp(_transitionStartPoint, _transitionStartPoint + _vectorFromWallHangOriginToHighLedge, _currentEnterHangTime / _enterHangDuration);
+                    transform.position = Vector3.Lerp(_transitionStartPoint, _transitionStartPoint + _vectorFromWallHangOriginToHighLedge, _currentEnterHangTime / _enterHangDuration);
 
                     if (_currentEnterHangTime >= _enterHangDuration)
                     {
                         _currentEnterHangTime = 0;
                         _isWallHanging = true;
+                        OnWallHangEntered?.Invoke();
+                        _originalHangPosition = transform.position;
+
+                        // provide the player some time to release the climb control
+                        // in case they only want to ledge hang
+                        Invoke(nameof(CompleteWallHangInputDelay), _wallHangInputDelay); 
                     }
                 }
                 else
@@ -528,11 +554,19 @@ namespace StarterAssets
                     //climb over if the player already triggered the climb over
                     if (_isClimbingOver)
                     {
+                        //Lerp the player up and over the ledge over time
                         if (transform.position != _transitionEndPoint)
                             MoveUpAndOver();
+
+                        // Exit the climb state.
                         else
                         {
+                            _isClimbingOver = false;
                             _isWallHanging = false;
+                            _isHighGrabReady = false;
+
+                            //cancel any previous ticking input delays
+                            CancelInvoke(nameof(CompleteWallHangInputDelay));
 
                             //trigger highgrab cooldown
                             Invoke(nameof(ReadyHighGrabCooldown), _highGrabCooldownDuration);
@@ -544,13 +578,21 @@ namespace StarterAssets
                             _transitionEndPoint = Vector3.negativeInfinity;
                             _controller.enabled = true;
                             _ledgeDetectManager.enabled = true;
+
+                            OnWallHangExited?.Invoke();
                         }
                     }
 
-                    //if hanging and the player moves backwards
-                    if (_input.move.y < 0 && _input.sprint && _isWallHangInputDelayComplete)
+                    //drop off the ledge if the player [moves backwards + sprint btn]
+                    //Only after the input delay completes
+                    else if (_input.move.y < 0 && _input.sprint && _isWallHangInputDelayComplete)
                     {
+                        _isClimbingOver = false;
                         _isWallHanging = false;
+                        _isHighGrabReady = false;
+
+                        //cancel any previous ticking input delays
+                        CancelInvoke(nameof(CompleteWallHangInputDelay));
 
                         //trigger highgrab cooldown
                         Invoke(nameof(ReadyHighGrabCooldown),_highGrabCooldownDuration);
@@ -562,12 +604,49 @@ namespace StarterAssets
                         _transitionEndPoint = Vector3.negativeInfinity;
                         _controller.enabled = true;
                         _ledgeDetectManager.enabled = true;
+
+                        OnWallHangExited?.Invoke();
                     } 
 
-                    //if hanging and the player moves forwards
+                    //trigger the climb over transition if the player [moves forwards + sprint btn]
+                    //Only after the input delay completes
                     else if (_input.move.y > 0 && _input.sprint && _isWallHangInputDelayComplete)
                     {
                         _isClimbingOver = true;
+                    }
+
+                    //pull the player up to peek over the ledge if moving forwards
+                    //only after the input delay
+                    else if (_input.move.y > 0 && _isWallHangInputDelayComplete)
+                    {
+                        //are we NOT YET at the peak peek?
+                        if (_currentPeekTime < _peekDuration)
+                        {
+                            _currentPeekTime += Time.deltaTime;
+
+                            transform.position = Vector3.Lerp(_originalHangPosition, _originalHangPosition + new Vector3(0, _peekOffset, 0), _currentPeekTime / _peekDuration);
+                        }
+                        else
+                        {
+                            _currentPeekTime = _peekDuration;
+                        }
+                    }
+
+                    //decline the player from the ledge if not moving forwards (downwards OR non-input)
+                    //only after the input delay
+                    else if (_input.move.y <= 0 && _isWallHangInputDelayComplete)
+                    {
+                        //are we NOT YET at the peak peek?
+                        if (_currentPeekTime > 0)
+                        {
+                            _currentPeekTime -= Time.deltaTime;
+
+                            transform.position = Vector3.Lerp(_originalHangPosition, _originalHangPosition + new Vector3(0, _peekOffset, 0), _currentPeekTime / _peekDuration);
+                        }
+                        else
+                        {
+                            _currentPeekTime = 0;
+                        }
                     }
 
                 }
