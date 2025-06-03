@@ -21,6 +21,7 @@ public class CamDisplacer : MonoBehaviour
     [SerializeField] private float _bobDistance = .2f;
     [SerializeField] private float _yDampening = .2f;
     [SerializeField] private float _bobIterationTime = .5f;
+    private bool _isSprinting = false;
     private float _currentBobTime = 0;
     private Cinemachine3rdPersonFollow _3rdPersonfollowComponent;
     private Vector3 _originalLocalPosition;
@@ -51,11 +52,15 @@ public class CamDisplacer : MonoBehaviour
     private void OnEnable()
     {
         _playerController.OnLand += ShakeScreenOnHardLandings;
+        _playerController.OnRunEnter += EnterSprint;
+        _playerController.OnRunExit += ExitSprint;
     }
 
     private void OnDisable()
     {
         _playerController.OnLand -= ShakeScreenOnHardLandings;
+        _playerController.OnRunEnter -= EnterSprint;
+        _playerController.OnRunExit -= ExitSprint;
     }
 
     private void Update()
@@ -72,7 +77,7 @@ public class CamDisplacer : MonoBehaviour
     //internals
     private void WatchPlayerSprintState()
     {
-        if (_playerController.IsSprinting() && _playerController.GetSpeed() > 4 && !_playerController.IsUngrounded() && !_isScreenShaking)
+        if (_isSprinting && _playerController.GetSpeed() > 4 && !_playerController.IsUngrounded() && !_isScreenShaking)
             _isBobActive = true;
         else _isBobActive = false;
     }
@@ -202,7 +207,8 @@ public class CamDisplacer : MonoBehaviour
         else if (landing == FootSoundType.landHeavy || landing == FootSoundType.landNasty)
             ShakeScreen(0.03f, _defaultDisplacementRange.magnitude * 2);
     }
-
+    private void EnterSprint() { _isSprinting = true; }
+    private void ExitSprint() {  _isSprinting = false; }
 
 
     //externals

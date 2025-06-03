@@ -36,6 +36,7 @@ public class ArmAnimController : MonoBehaviour
 
 
     private FirstPersonController _playerController;
+    private bool _isSprinting = false;
     private bool _isRunDetected = false;
     private float _startDelay;
     private bool _waitingToStart = false;
@@ -46,7 +47,7 @@ public class ArmAnimController : MonoBehaviour
 
 
     //monobehaviours
-    private void Start()
+    private void Awake()
     {
         _playerController = GetComponent<FirstPersonController>();
     }
@@ -54,11 +55,15 @@ public class ArmAnimController : MonoBehaviour
     private void OnEnable()
     {
         _footstepper.OnFootstep += StartAnimation;
+        _playerController.OnRunEnter += EnterSprint;
+        _playerController.OnRunExit += ExitSprint;
     }
 
     private void OnDisable()
     {
         _footstepper.OnFootstep -= StartAnimation;
+        _playerController.OnRunEnter -= EnterSprint;
+        _playerController.OnRunExit -= ExitSprint;
     }
 
     private void Update()
@@ -83,7 +88,7 @@ public class ArmAnimController : MonoBehaviour
     {
         if (_playerController != null)
         {
-            if (_playerController.IsSprinting() && !_playerController.IsUngrounded() && _playerController.GetSpeed() > 4.0f)
+            if (_isSprinting && !_playerController.IsUngrounded() && _playerController.GetSpeed() > 4.0f)
                 _isRunDetected = true;
             else _isRunDetected = false;
         }
@@ -136,6 +141,8 @@ public class ArmAnimController : MonoBehaviour
     }
 
 
+    private void EnterSprint() { _isSprinting = true; }
+    private void ExitSprint() {  _isSprinting = false; }
 
 
     private RaycastHit CastDetection(Vector3 origin, Vector3 direction, float distance, ArmSide side)

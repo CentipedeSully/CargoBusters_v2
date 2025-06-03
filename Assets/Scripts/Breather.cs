@@ -54,7 +54,8 @@ public class Breather : MonoBehaviour
     {
         _firstPersonController.OnJump += TriggerJumpBreath;
         _firstPersonController.OnLand += TriggerLandingBreath;
-
+        _firstPersonController.OnRunEnter += TriggerHeavyBreathing;
+        _firstPersonController.OnRunExit += ExitHeavyBreathing;
 
     }
 
@@ -62,14 +63,16 @@ public class Breather : MonoBehaviour
     {
         _firstPersonController.OnJump -= TriggerJumpBreath;
         _firstPersonController.OnLand -= TriggerLandingBreath;
+        _firstPersonController.OnRunEnter -= TriggerHeavyBreathing;
+        _firstPersonController.OnRunExit -= ExitHeavyBreathing;
 
 
     }
 
     private void Update()
     {
-        WatchSprintState();
-        WatchUngroundedState();
+        //WatchSprintState(); //sets or unsets the winded state
+        WatchUngroundedState(); //pauses or unpauses breathing
 
         if (!_isHeavyBreathingPaused && _isBreathEnabled)
         {
@@ -81,13 +84,6 @@ public class Breather : MonoBehaviour
 
 
     //internals
-    private void WatchSprintState()
-    {
-        if (_firstPersonController.IsSprinting())
-            TriggerHeavyBreathing();
-        else ExitHeavyBreathing();
-    }
-
     private void WatchUngroundedState()
     {
         //pause the breathing if the player is falling while heavy breathing
@@ -233,10 +229,12 @@ public class Breather : MonoBehaviour
     private void TriggerHeavyBreathing()
     {
         _isWinded = true;
+        //Debug.Log("Heavy Breath Triggered");
     }
     private void ExitHeavyBreathing()
     {
         _isWinded = false;
+        //Debug.Log("CANCALLED Heavy Breath");
     }
 
     private void PauseHeavyBreathing() { _isHeavyBreathingPaused = true; _heavyBreathingSource.Stop(); }

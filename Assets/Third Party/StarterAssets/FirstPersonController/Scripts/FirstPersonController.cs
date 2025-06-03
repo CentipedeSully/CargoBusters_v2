@@ -32,6 +32,7 @@ namespace StarterAssets
         [SerializeField] private float _moveSpeed = 4.0f;
         [SerializeField] private float _sprintSpeed = 6.0f;
         [SerializeField] private bool _isSprinting = false;
+        private bool _wasSprintingPreviously = false;
         [SerializeField] private bool _isSprintAvailable = true;
         [Tooltip("Rotation speed of the character")]
         [SerializeField] private float _rotationSpeed = 1.0f;
@@ -53,7 +54,10 @@ namespace StarterAssets
         [Space(10)]
         [SerializeField] private LedgeType _transitionType = LedgeType.unset;
         [SerializeField] private Vector3 _transitionEndPoint = Vector3.negativeInfinity;
-        [SerializeField] private float _transitionDuration = 1f;
+        [SerializeField] private float _highTransitionDuration = 2.5f;
+        [SerializeField] private float _midTransitionDuration = 1.75f;
+        [SerializeField] private float _lowTransitionDuration = 1f;
+         private float _transitionDuration;
         private float _currentTransitionTime = 0;
         private Vector3 _transitionStartPoint;
 
@@ -349,13 +353,30 @@ namespace StarterAssets
         private void UpdateSprintState()
         {
             //only spring if it's available and not using the crouch mechanic
-            if (_isSprintAvailable && (!_isCrouched && !_isCrouchTransitioning))
+            if (_isSprintAvailable && _input.sprint && (!_isCrouched && !_isCrouchTransitioning))
             {
-                _isSprinting = _input.sprint;
+                
+                _isSprinting = true;
+
+                //set a flag that determines this sprint's start,
+                //and raise the sprint's starting event
+                if (!_wasSprintingPreviously)
+                {
+                    _wasSprintingPreviously = true;
+                    OnRunEnter?.Invoke();
+                }
             }
             else
             {
                 _isSprinting = false;
+
+                //reset the flag that determine's the sprint start,
+                //and raise the sprint's ending event
+                if (_wasSprintingPreviously)
+                {
+                    _wasSprintingPreviously = false;
+                    OnRunExit?.Invoke();
+                }
             }
 
         }
@@ -432,7 +453,21 @@ namespace StarterAssets
                 _isClimbAvailable = false;
              
         }
+        
+        private void InterruptGeneralMovementStateUtilities()
+        {
+            //reset sprint utils
+            if (_isSprinting)
+            {
+                _isSprinting = false;
+                _wasSprintingPreviously = false;
+                OnRunExit?.Invoke();
+            }
 
+            //reset jump
+            _jumpTimeoutCompleted = true;
+            _jumpTimeoutDelta = _jumpTimeout;
+        }
         private void EnterClimb()
         {
             if (_isClimbAvailable && _ledgeDetectManager.IsLedgeStillValid(_detectedLedgeType, _ledgePosition))
@@ -453,9 +488,20 @@ namespace StarterAssets
                 _transitionStartPoint = transform.position;
                 _transitionEndPoint = _ledgePosition;
 
+                //set the transition's duration
+                if (_transitionType == LedgeType.low)
+                    _transitionDuration = _lowTransitionDuration;
+                else if (_transitionType == LedgeType.mid)
+                    _transitionDuration = _midTransitionDuration;
+                else if (_transitionType == LedgeType.high)
+                    _transitionDuration = _highTransitionDuration;
+
                 //Clear any velocity utils
                 _controller.SimpleMove(Vector3.zero);
                 _controller.enabled = false;
+
+                //Clear any other generalStates that shouldn't continue
+                InterruptGeneralMovementStateUtilities();
 
                 //reset the transition timer
                 _currentTransitionTime = 0;
@@ -585,69 +631,73 @@ namespace StarterAssets
 
                     //drop off the ledge if the player [moves backwards + sprint btn]
                     //Only after the input delay completes
-                    else if (_input.move.y < 0 && _input.sprint && _isWallHangInputDelayComplete)
+                    else if (_isWallHangInputDelayComplete)
                     {
-                        _isClimbingOver = false;
-                        _isWallHanging = false;
-                        _isHighGrabReady = false;
+                        if (_input.move.y < 0 && _input.sprint)
+                        {
+                            _isClimbingOver = false;
+                            _isWallHanging = false;
+                            _isHighGrabReady = false;
 
-                        //cancel any previous ticking input delays
-                        CancelInvoke(nameof(CompleteWallHangInputDelay));
+                            //cancel any previous ticking input delays
+                            CancelInvoke(nameof(CompleteWallHangInputDelay));
 
-                        //trigger highgrab cooldown
-                        Invoke(nameof(ReadyHighGrabCooldown),_highGrabCooldownDuration);
+                            //trigger highgrab cooldown
+                            Invoke(nameof(ReadyHighGrabCooldown), _highGrabCooldownDuration);
 
-                        //leave the climbing state and fall
-                        _movementState = MovementState.General;
-                        _transitionType = LedgeType.unset;
-                        _transitionStartPoint = Vector3.negativeInfinity;
-                        _transitionEndPoint = Vector3.negativeInfinity;
-                        _controller.enabled = true;
-                        _ledgeDetectManager.enabled = true;
+                            //leave the climbing state and fall
+                            _movementState = MovementState.General;
+                            _transitionType = LedgeType.unset;
+                            _transitionStartPoint = Vector3.negativeInfinity;
+                            _transitionEndPoint = Vector3.negativeInfinity;
+                            _controller.enabled = true;
+                            _ledgeDetectManager.enabled = true;
 
-                        OnWallHangExited?.Invoke();
-                    } 
+                            OnWallHangExited?.Invoke();
+                        }
 
-                    //trigger the climb over transition if the player [moves forwards + sprint btn]
-                    //Only after the input delay completes
-                    else if (_input.move.y > 0 && _input.sprint && _isWallHangInputDelayComplete)
-                    {
-                        _isClimbingOver = true;
+                        //trigger the climb over transition if the player [moves forwards + sprint btn]
+                        //Only after the input delay completes
+                        else if (_input.move.y > 0 && _input.sprint)
+                        {
+                            _isClimbingOver = true;
+                        }
+
+                        //pull the player up to peek over the ledge if moving forwards
+                        //only after the input delay
+                        else if (_input.move.y > 0)
+                        {
+                            //are we NOT YET at the peak peek?
+                            if (_currentPeekTime < _peekDuration)
+                            {
+                                _currentPeekTime += Time.deltaTime;
+
+                                transform.position = Vector3.Lerp(_originalHangPosition, _originalHangPosition + new Vector3(0, _peekOffset, 0), _currentPeekTime / _peekDuration);
+                            }
+                            else
+                            {
+                                _currentPeekTime = _peekDuration;
+                            }
+                        }
+
+                        //decline the player from the ledge if not moving forwards (downwards OR non-input)
+                        //only after the input delay
+                        else if (_input.move.y <= 0)
+                        {
+                            //are we NOT YET at the peak peek?
+                            if (_currentPeekTime > 0)
+                            {
+                                _currentPeekTime -= Time.deltaTime;
+
+                                transform.position = Vector3.Lerp(_originalHangPosition, _originalHangPosition + new Vector3(0, _peekOffset, 0), _currentPeekTime / _peekDuration);
+                            }
+                            else
+                            {
+                                _currentPeekTime = 0;
+                            }
+                        }
                     }
-
-                    //pull the player up to peek over the ledge if moving forwards
-                    //only after the input delay
-                    else if (_input.move.y > 0 && _isWallHangInputDelayComplete)
-                    {
-                        //are we NOT YET at the peak peek?
-                        if (_currentPeekTime < _peekDuration)
-                        {
-                            _currentPeekTime += Time.deltaTime;
-
-                            transform.position = Vector3.Lerp(_originalHangPosition, _originalHangPosition + new Vector3(0, _peekOffset, 0), _currentPeekTime / _peekDuration);
-                        }
-                        else
-                        {
-                            _currentPeekTime = _peekDuration;
-                        }
-                    }
-
-                    //decline the player from the ledge if not moving forwards (downwards OR non-input)
-                    //only after the input delay
-                    else if (_input.move.y <= 0 && _isWallHangInputDelayComplete)
-                    {
-                        //are we NOT YET at the peak peek?
-                        if (_currentPeekTime > 0)
-                        {
-                            _currentPeekTime -= Time.deltaTime;
-
-                            transform.position = Vector3.Lerp(_originalHangPosition, _originalHangPosition + new Vector3(0, _peekOffset, 0), _currentPeekTime / _peekDuration);
-                        }
-                        else
-                        {
-                            _currentPeekTime = 0;
-                        }
-                    }
+                    
 
                 }
                 
