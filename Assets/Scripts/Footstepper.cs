@@ -18,6 +18,7 @@ public class Footstepper : MonoBehaviour
     [SerializeField] private float _originalFootstepVolume;
     [SerializeField] private float _crouchedVolume = .4f;
     private float _targetTickDistance = 0;
+    private bool _isClimbing = false;
 
     public delegate void FootstepEvent();
     public event FootstepEvent OnFootstep;
@@ -37,6 +38,8 @@ public class Footstepper : MonoBehaviour
         _firstPersonController.OnJump += TriggerJumpSideEffects;
         _firstPersonController.OnLand += TriggerLandingSideEffects;
         _firstPersonController.OnUngrounded += HaltFootstepTracking;
+        _firstPersonController.OnWallHangEntered += EnterClimb;
+        _firstPersonController.OnWallHangExited += ExitClimb;
     }
 
     private void OnDisable()
@@ -44,11 +47,13 @@ public class Footstepper : MonoBehaviour
         _firstPersonController.OnJump -= TriggerJumpSideEffects;
         _firstPersonController.OnLand -= TriggerLandingSideEffects;
         _firstPersonController.OnUngrounded -= HaltFootstepTracking;
+        _firstPersonController.OnWallHangEntered -= EnterClimb;
+        _firstPersonController.OnWallHangExited -= ExitClimb;
     }
 
     private void Update()
     {
-        if (_firstPersonController != null && _footstepsEnabled)
+        if (_firstPersonController != null && _footstepsEnabled && !_isClimbing)
         {
             ManageFootstepVolume();
             IncrementTick(_firstPersonController.GetSpeed() * Time.deltaTime);
@@ -116,6 +121,16 @@ public class Footstepper : MonoBehaviour
     {
         _footstepsEnabled = false;
         ResetTick();
+    }
+
+    private void EnterClimb()
+    {
+        _isClimbing = true;
+    }
+
+    private void ExitClimb()
+    {
+        _isClimbing = false;
     }
 
 

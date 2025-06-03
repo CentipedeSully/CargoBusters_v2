@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Net;
 using TMPro;
-using TreeEditor;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -54,12 +53,12 @@ namespace StarterAssets
         [Space(10)]
         [SerializeField] private LedgeType _transitionType = LedgeType.unset;
         [SerializeField] private Vector3 _transitionEndPoint = Vector3.negativeInfinity;
-        [SerializeField] private float _highTransitionDuration = 2.5f;
-        [SerializeField] private float _midTransitionDuration = 1.75f;
-        [SerializeField] private float _lowTransitionDuration = 1f;
-         private float _transitionDuration;
-        private float _currentTransitionTime = 0;
         private Vector3 _transitionStartPoint;
+        private bool _transitionComplete = false;
+        [SerializeField] private float _highTransitionSpeed = 1;
+        [SerializeField] private float _midTransitionSpeed = 1;
+        [SerializeField] private float _lowTransitionSpeed = 1;
+        [SerializeField] private bool _midwayPointReached = false;
 
         //Wall Hanging
         [Space(10)]
@@ -487,14 +486,8 @@ namespace StarterAssets
                 _transitionType = _detectedLedgeType;
                 _transitionStartPoint = transform.position;
                 _transitionEndPoint = _ledgePosition;
-
-                //set the transition's duration
-                if (_transitionType == LedgeType.low)
-                    _transitionDuration = _lowTransitionDuration;
-                else if (_transitionType == LedgeType.mid)
-                    _transitionDuration = _midTransitionDuration;
-                else if (_transitionType == LedgeType.high)
-                    _transitionDuration = _highTransitionDuration;
+                _transitionComplete = false;
+                _midwayPointReached = false;
 
                 //Clear any velocity utils
                 _controller.SimpleMove(Vector3.zero);
@@ -502,9 +495,6 @@ namespace StarterAssets
 
                 //Clear any other generalStates that shouldn't continue
                 InterruptGeneralMovementStateUtilities();
-
-                //reset the transition timer
-                _currentTransitionTime = 0;
                 
                 if (_detectedLedgeType == LedgeType.high)
                 {
@@ -539,7 +529,7 @@ namespace StarterAssets
             //low ledge transition
             if (_transitionType == LedgeType.low)
             {
-                if (transform.position != _transitionEndPoint)
+                if (!_transitionComplete)
                 {
                     MoveUpAndOver();
                 }
@@ -557,7 +547,7 @@ namespace StarterAssets
             //mid ledge transisiton
             else if (_transitionType == LedgeType.mid)
             {
-                if (transform.position != _transitionEndPoint)
+                if (!_transitionComplete)
                 {
                     MoveUpAndOver();
                 }
@@ -601,7 +591,7 @@ namespace StarterAssets
                     if (_isClimbingOver)
                     {
                         //Lerp the player up and over the ledge over time
-                        if (transform.position != _transitionEndPoint)
+                        if (!_transitionComplete)
                             MoveUpAndOver();
 
                         // Exit the climb state.
@@ -711,23 +701,33 @@ namespace StarterAssets
 
         private void MoveUpAndOver()
         {
-            _currentTransitionTime += Time.deltaTime;
+
             Vector3 MidwayPoint = new Vector3(_transitionStartPoint.x, _transitionEndPoint.y, _transitionStartPoint.z);
 
+            float transitionSpeed = 0;
+            if (_detectedLedgeType == LedgeType.low)
+                transitionSpeed = _lowTransitionSpeed * Time.deltaTime;
+            else if (_detectedLedgeType == LedgeType.mid)
+                transitionSpeed = _midTransitionSpeed * Time.deltaTime;
+            else if (_detectedLedgeType == LedgeType.high)
+                transitionSpeed = _highTransitionSpeed * Time.deltaTime;
 
-            //go over the necessary y distance for the first half of the duration
-            if (_currentTransitionTime < _transitionDuration/2)
+            if (!_midwayPointReached)
             {
-                transform.position = Vector3.Lerp(_transitionStartPoint, MidwayPoint, _currentTransitionTime / (_transitionDuration / 2));
+                transform.position = Vector3.MoveTowards(transform.position, MidwayPoint, transitionSpeed);
+
+                if (transform.position == MidwayPoint)
+                    _midwayPointReached = true;
+            }
+                
+            else if (!_transitionComplete)
+            {
+                transform.position = Vector3.MoveTowards(transform.position, _transitionEndPoint, transitionSpeed);
+                
+                if (transform.position == _transitionEndPoint)
+                    _transitionComplete = true;
             }
 
-            //go over the remaining xz plane
-            else
-            {
-                transform.position = Vector3.Lerp(MidwayPoint, _transitionEndPoint, _currentTransitionTime / _transitionDuration);
-            }
-
-            
         }
 
 

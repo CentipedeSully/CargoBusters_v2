@@ -3231,6 +3231,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: MainCamera
       objectReference: {fileID: 0}
+    - target: {fileID: 9018249871969862650, guid: 2d3a85ecde41a8246a79669975912b74,
+        type: 3}
+      propertyPath: m_UpdateMethod
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -3741,7 +3746,12 @@ MonoBehaviour:
   _ledgePosition: {x: 0, y: 0, z: 0}
   _transitionType: 0
   _transitionEndPoint: {x: -Infinity, y: -Infinity, z: -Infinity}
-  _transitionDuration: 0.25
+  _highTransitionDuration: 1.75
+  _highTransitionVerticalCompletionPoint: 0.8
+  _midTransitionDuration: 0.5
+  _midTransitionVerticalCompletionPoint: 0.75
+  _lowTransitionDuration: 0.3
+  _lowTransitionVerticalCompletionPoint: 0.5
   _wallHangOffsetOrigin: {fileID: 1416831237}
   _enterHangDuration: 0.2
   _wallHangInputDelay: 0.5
@@ -3749,7 +3759,7 @@ MonoBehaviour:
   _isHighGrabReady: 1
   _highGrabCooldownDuration: 1
   _peekDuration: 0.33
-  _peekOffset: 1
+  _peekOffset: 1.25
   _cameraHeightTransitionSpeed: 2
   _isCrouched: 0
   _crouchHeight: 1
