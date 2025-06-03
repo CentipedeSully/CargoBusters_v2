@@ -3746,12 +3746,10 @@ MonoBehaviour:
   _ledgePosition: {x: 0, y: 0, z: 0}
   _transitionType: 0
   _transitionEndPoint: {x: -Infinity, y: -Infinity, z: -Infinity}
-  _highTransitionDuration: 1.75
-  _highTransitionVerticalCompletionPoint: 0.8
-  _midTransitionDuration: 0.5
-  _midTransitionVerticalCompletionPoint: 0.75
-  _lowTransitionDuration: 0.3
-  _lowTransitionVerticalCompletionPoint: 0.5
+  _highTransitionSpeed: 3
+  _midTransitionSpeed: 3
+  _lowTransitionSpeed: 6
+  _midwayPointReached: 0
   _wallHangOffsetOrigin: {fileID: 1416831237}
   _enterHangDuration: 0.2
   _wallHangInputDelay: 0.5
@@ -3769,7 +3767,7 @@ MonoBehaviour:
   _crouchGizmo: {fileID: 1687412103}
   _jumpHeight: 1.2
   _gravity: -15
-  _jumpTimeout: 0.1
+  _jumpTimeout: 0.2
   _jumpTimeoutCompleted: 1
   _fallTimeout: 0.15
   _fallTimeoutCompleted: 0

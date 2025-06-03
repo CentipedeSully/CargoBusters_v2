@@ -73,6 +73,7 @@ namespace StarterAssets
         [SerializeField] private float _enterHangDuration = .2f;
         [Tooltip("A buffer time before reading the player's next Input after entering a wall hang")]
         [SerializeField] private float _wallHangInputDelay = .2f;
+        private bool _ignoreWallHangDelay = false;
         private bool _isWallHangInputDelayComplete = true;
         private float _currentEnterHangTime = 0;
         [Tooltip("Is the player hanging from a ledge?")]
@@ -306,7 +307,6 @@ namespace StarterAssets
                 UpdateLandingSound();
                 Crouch();
                 UpdateCameraHeight();
-                DetermineClimbAvailability();
                 EnterClimb();
             }
 		}
@@ -434,24 +434,7 @@ namespace StarterAssets
             }
 
         }
-        private void DetermineClimbAvailability()
-        {
-            if ( _isClimbEnabled)
-            {
-                //are we sprinting(while grounded) or are we Falling? WHILE NOT ALREADY CLIMBING
-                if ( (_isSprinting && _logicallyGrounded && _input.move.y == 1 || !_logicallyGrounded && _verticalVelocity < 0) && _movementState != MovementState.Climbing)
-                {
-                    _isClimbAvailable = true;
-                }
-                else
-                {
-                    _isClimbAvailable = false;
-                }
-            }
-            else
-                _isClimbAvailable = false;
-             
-        }
+
         
         private void InterruptGeneralMovementStateUtilities()
         {
@@ -464,44 +447,82 @@ namespace StarterAssets
             }
 
             //reset jump
-            _jumpTimeoutCompleted = true;
+            _jumpTimeoutCompleted = false;
             _jumpTimeoutDelta = _jumpTimeout;
         }
+        private void InitBaseClimbStates()
+        {
+            //Disable Ledge Detection temporarily
+            _ledgeDetectManager.enabled = false;
+
+            //Change the movement state
+            _movementState = MovementState.Climbing;
+
+            //specify the transition state
+            _transitionType = _detectedLedgeType;
+            _transitionStartPoint = transform.position;
+            _transitionEndPoint = _ledgePosition;
+            _transitionComplete = false;
+            _midwayPointReached = false;
+
+            //Clear any velocity utils
+            _controller.SimpleMove(Vector3.zero);
+            _controller.enabled = false;
+        }
+
+
         private void EnterClimb()
         {
-            if (_isClimbAvailable && _ledgeDetectManager.IsLedgeStillValid(_detectedLedgeType, _ledgePosition))
+            //if the mechanic is enabled and we aren't already climbing (&& the detected ledge is still within reach)
+            if (_isClimbEnabled && _movementState != MovementState.Climbing && _ledgeDetectManager.IsLedgeStillValid(_detectedLedgeType, _ledgePosition))
             {
-                //DONT enter climb if the ledge is high and the highGrab cooldown isn't complete
-                if (_detectedLedgeType == LedgeType.high && !_isHighGrabReady)
-                    return;
-
-
-                //Disable Ledge Detection temporarily
-                _ledgeDetectManager.enabled = false;
-
-                //Change the movement state
-                _movementState = MovementState.Climbing;
-
-                //specify the transition state
-                _transitionType = _detectedLedgeType;
-                _transitionStartPoint = transform.position;
-                _transitionEndPoint = _ledgePosition;
-                _transitionComplete = false;
-                _midwayPointReached = false;
-
-                //Clear any velocity utils
-                _controller.SimpleMove(Vector3.zero);
-                _controller.enabled = false;
-
-                //Clear any other generalStates that shouldn't continue
-                InterruptGeneralMovementStateUtilities();
-                
-                if (_detectedLedgeType == LedgeType.high)
+                //Detect Sprint-based Climb contexts
+                //valid contexts: Low, Mid, Special High Case
+                if (_isSprinting && _logicallyGrounded && _input.move.y == 1)
                 {
-                    SetupLedgeGrab();
+                    //enter the low or mid if sprinting into the context
+                    if (_detectedLedgeType == LedgeType.low || _detectedLedgeType == LedgeType.mid)
+                    {
+                        InitBaseClimbStates();
+
+                        //Clear any other generalStates that shouldn't continue
+                        InterruptGeneralMovementStateUtilities();
+                    }
+                    
+                    //enter the ledge climb context if also pressing jump (while not in ledgeGrab cooldown)
+                    else if (_input.jump && _detectedLedgeType == LedgeType.high && _isHighGrabReady)
+                    {
+                        InitBaseClimbStates();
+
+                        //Clear any other generalStates that shouldn't continue
+                        InterruptGeneralMovementStateUtilities();
+
+                        SetupLedgeGrab();
+
+                        //ignore the input delay. Climbs are faster when not falling into them
+                        _ignoreWallHangDelay = true;
+                    }
+
                 }
 
+                //Detect Falling Climb Contexts
+                //valid contexts: High & Mid ledges (with an input delay)
+                else if (!_logicallyGrounded && _verticalVelocity < 0)
+                {
+                    //enter the ledge climb context if we caught one during a fall
+                    if (_detectedLedgeType == LedgeType.high && _isHighGrabReady)
+                    {
+                        InitBaseClimbStates();
 
+                        //Clear any other generalStates that shouldn't continue
+                        InterruptGeneralMovementStateUtilities();
+
+                        SetupLedgeGrab();
+
+                        //Climbs are slower when falling into them
+                        _ignoreWallHangDelay = false;
+                    }
+                }
             }
         }
 
@@ -581,8 +602,15 @@ namespace StarterAssets
                         _originalHangPosition = transform.position;
 
                         // provide the player some time to release the climb control
-                        // in case they only want to ledge hang
-                        Invoke(nameof(CompleteWallHangInputDelay), _wallHangInputDelay); 
+                        // in case they only want to ledge hang, or if they fell into it
+                        if (_ignoreWallHangDelay)
+                        {
+                            _ignoreWallHangDelay = false;
+                            _isWallHangInputDelayComplete = true;
+                        }
+
+                        else 
+                            Invoke(nameof(CompleteWallHangInputDelay), _wallHangInputDelay); 
                     }
                 }
                 else
