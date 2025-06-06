@@ -38,15 +38,20 @@ MonoBehaviour:
   - {fileID: 8300000, guid: e5921d594721f92449d1cb06e30d1822, type: 3}
   - {fileID: 8300000, guid: c5652629087fcc14a89b0fe9b2f9b7a2, type: 3}
   _femaleLandHeavyBreaths:
-  - {fileID: 8300000, guid: 069e8d28b4292454187924b43d44bd97, type: 3}
-  - {fileID: 8300000, guid: 917fcebfc975a75429c110f6c7f1387f, type: 3}
-  - {fileID: 8300000, guid: 5b4ebdf3f6961694cbd46496d2ccaf1b, type: 3}
-  - {fileID: 8300000, guid: 318c0dd7750daa54aa645c4f7067db50, type: 3}
-  - {fileID: 8300000, guid: 7a5b75b4dcc4016419c9f291d72a7a7e, type: 3}
-  - {fileID: 8300000, guid: 20ccd7655f796c640a70c315829b68f0, type: 3}
-  - {fileID: 8300000, guid: 5b115acdc4a74594cb60a8ed8ee275c3, type: 3}
+  - {fileID: 8300000, guid: b5cfeac51836341479b470ad1ec7a586, type: 3}
+  - {fileID: 8300000, guid: c5b5f9d1e2023fa4e9ac7fb1d3600a4c, type: 3}
+  - {fileID: 8300000, guid: e36f8969eb514dd42bf5126a5116620d, type: 3}
   _femaleLandNastyBreaths:
   - {fileID: 8300000, guid: ce6bc27d7a16d9e4bb2cf74a7b397392, type: 3}
-  - {fileID: 8300000, guid: c67a0647d28fe644990c65f353bd43ba, type: 3}
+  - {fileID: 8300000, guid: 2cd5b70844a5d2149a988bbf32fa4ab2, type: 3}
   - {fileID: 8300000, guid: c67a0647d28fe644990c65f353bd43ba, type: 3}
   - {fileID: 8300000, guid: 6dded875e32740a47a91b75ceed815f7, type: 3}
+  _femaleModerateGrunt:
+  - {fileID: 8300000, guid: 8b4c99dde5c09674aae678124df03393, type: 3}
+  - {fileID: 8300000, guid: cf9804f0275e4d54ebe46901668dd356, type: 3}
+  - {fileID: 8300000, guid: 65ab82acc71b1c54cbaa61aa1264fe42, type: 3}
+  _femaleHeavyGrunt:
+  - {fileID: 8300000, guid: dd686f01f0c904f46b27389d12340dcb, type: 3}
+  - {fileID: 8300000, guid: de8a42ca76abf9143ba7617145de5af0, type: 3}
+  - {fileID: 8300000, guid: 5b84528b023e9704f9a915c16e8830bf, type: 3}
+  - {fileID: 8300000, guid: e7c96e4709530e04986096861870ed45, type: 3}

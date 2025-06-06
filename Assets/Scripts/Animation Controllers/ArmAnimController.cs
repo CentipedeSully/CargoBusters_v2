@@ -34,6 +34,9 @@ public class ArmAnimController : MonoBehaviour
     
     [SerializeField] private bool _isMovingForwardsAgainstWall;
 
+    [Header("Wall Hang IK")]
+    [SerializeField] float _wallDetectDistance = .5f;
+
 
     private FirstPersonController _playerController;
     private bool _isSprinting = false;
@@ -43,6 +46,7 @@ public class ArmAnimController : MonoBehaviour
     private bool _isRightArmDetectingObstacle = false;
     private bool _isLeftArmDetectingObstacle = false;
 
+    private bool _isWallHanging = false;
 
 
 

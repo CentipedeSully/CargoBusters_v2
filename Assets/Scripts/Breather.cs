@@ -57,6 +57,9 @@ public class Breather : MonoBehaviour
         _firstPersonController.OnRunEnter += TriggerHeavyBreathing;
         _firstPersonController.OnRunExit += ExitHeavyBreathing;
 
+        _firstPersonController.OnMidTransitionEnter += TriggerModerateGrunt;
+        _firstPersonController.OnWallClimbOverTriggered += TriggerHeavyGrunt;
+
     }
 
     private void OnDisable()
@@ -65,6 +68,9 @@ public class Breather : MonoBehaviour
         _firstPersonController.OnLand -= TriggerLandingBreath;
         _firstPersonController.OnRunEnter -= TriggerHeavyBreathing;
         _firstPersonController.OnRunExit -= ExitHeavyBreathing;
+
+        _firstPersonController.OnMidTransitionEnter -= TriggerModerateGrunt;
+        _firstPersonController.OnWallClimbOverTriggered -= TriggerHeavyGrunt;
 
 
     }
@@ -277,7 +283,23 @@ public class Breather : MonoBehaviour
         }
     }
 
+    private void TriggerModerateGrunt()
+    {
+        if (_isBreathEnabled && _audioSource != null && _breathData != null)
+        {
+            _audioSource.clip = _breathData.GetRandomClip(_voiceGender,BreathType.gruntModerate);
+            _audioSource.Play();
+        }
+    }
 
+    private void TriggerHeavyGrunt()
+    {
+        if (_isBreathEnabled && _audioSource != null && _breathData != null)
+        {
+            _audioSource.clip = _breathData.GetRandomClip(_voiceGender, BreathType.gruntHeavy);
+            _audioSource.Play();
+        }
+    }
 
 
 

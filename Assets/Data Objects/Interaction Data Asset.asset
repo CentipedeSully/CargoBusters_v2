@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 347c4a0e1c8750346a120f385d2fa900, type: 3}
+  m_Name: Interaction Data Asset
+  m_EditorClassIdentifier: 
+  _fleshyAudio:
+  - {fileID: 8300000, guid: 92ad551652851604c80f91072fdf0784, type: 3}
+  - {fileID: 8300000, guid: c6267e5438af51b4ba37fac3f88c7c85, type: 3}
+  - {fileID: 8300000, guid: 29c39dda1d229054a95eca884d3ab5d8, type: 3}
+  - {fileID: 8300000, guid: 54375b02301cf8048a7306c0926b30d7, type: 3}
+  - {fileID: 8300000, guid: 5268b3e7229578d45ba10bae113320d9, type: 3}
+  - {fileID: 8300000, guid: ae475347e8944fc40b18198a7a7d26c9, type: 3}
+  - {fileID: 8300000, guid: 15a768170983c4643bc063832a808ecd, type: 3}
+  _fleshyMultihitAudio:
+  - {fileID: 8300000, guid: 72051c1cfe414ae4bb7078172b2f742f, type: 3}

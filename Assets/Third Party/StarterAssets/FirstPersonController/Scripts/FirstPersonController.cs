@@ -189,7 +189,14 @@ namespace StarterAssets
 		public event MovementEvent OnCrouchEnter;
 		public event MovementEvent OnCrouchExit;
 
+        public event MovementEvent OnLowTransitionEnter;
+        public event MovementEvent OnLowTransitionExit;
+
+        public event MovementEvent OnMidTransitionEnter;
+        public event MovementEvent OnMidTransitionExit;
+
         public event MovementEvent OnWallHangEntered;
+        public event MovementEvent OnWallClimbOverTriggered;
         public event MovementEvent OnWallHangExited;
 
 
@@ -487,6 +494,12 @@ namespace StarterAssets
 
                         //Clear any other generalStates that shouldn't continue
                         InterruptGeneralMovementStateUtilities();
+
+                        //trigger the respective enter event
+                        if (_detectedLedgeType == LedgeType.low)
+                            OnLowTransitionEnter?.Invoke();
+                        else if (_detectedLedgeType == LedgeType.mid)
+                            OnMidTransitionEnter?.Invoke();
                     }
                     
                     //enter the ledge climb context if also pressing jump (while not in ledgeGrab cooldown)
@@ -501,12 +514,15 @@ namespace StarterAssets
 
                         //ignore the input delay. Climbs are faster when not falling into them
                         _ignoreWallHangDelay = true;
+
+                        //onEnter triggers when the player complete's the intro wallHang transition
+                        //not here, not yet
                     }
 
                 }
 
                 //Detect Falling Climb Contexts
-                //valid contexts: High & Mid ledges (with an input delay)
+                //valid contexts: High (with an input delay) ===> Implement Mid ledges later 
                 else if (!_logicallyGrounded && _verticalVelocity < 0)
                 {
                     //enter the ledge climb context if we caught one during a fall
@@ -562,6 +578,7 @@ namespace StarterAssets
                     _transitionEndPoint = Vector3.negativeInfinity;
                     _controller.enabled = true;
                     _ledgeDetectManager.enabled = true;
+                    OnLowTransitionExit?.Invoke();
                 }
             }
 
@@ -580,6 +597,7 @@ namespace StarterAssets
                     _transitionEndPoint = Vector3.negativeInfinity;
                     _controller.enabled = true;
                     _ledgeDetectManager.enabled = true;
+                    OnMidTransitionExit?.Invoke();
                 }
             }
 
@@ -679,6 +697,7 @@ namespace StarterAssets
                         else if (_input.move.y > 0 && _input.sprint)
                         {
                             _isClimbingOver = true;
+                            OnWallClimbOverTriggered?.Invoke();
                         }
 
                         //pull the player up to peek over the ledge if moving forwards

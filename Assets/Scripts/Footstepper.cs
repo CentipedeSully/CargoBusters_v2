@@ -38,6 +38,10 @@ public class Footstepper : MonoBehaviour
         _firstPersonController.OnJump += TriggerJumpSideEffects;
         _firstPersonController.OnLand += TriggerLandingSideEffects;
         _firstPersonController.OnUngrounded += HaltFootstepTracking;
+
+        _firstPersonController.OnMidTransitionEnter += EnterClimb;
+        _firstPersonController.OnMidTransitionExit += ExitClimb;
+
         _firstPersonController.OnWallHangEntered += EnterClimb;
         _firstPersonController.OnWallHangExited += ExitClimb;
     }
@@ -47,6 +51,10 @@ public class Footstepper : MonoBehaviour
         _firstPersonController.OnJump -= TriggerJumpSideEffects;
         _firstPersonController.OnLand -= TriggerLandingSideEffects;
         _firstPersonController.OnUngrounded -= HaltFootstepTracking;
+
+        _firstPersonController.OnMidTransitionEnter -= EnterClimb;
+        _firstPersonController.OnMidTransitionExit -= ExitClimb;
+
         _firstPersonController.OnWallHangEntered -= EnterClimb;
         _firstPersonController.OnWallHangExited -= ExitClimb;
     }
