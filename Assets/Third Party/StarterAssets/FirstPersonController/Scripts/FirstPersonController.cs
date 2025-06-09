@@ -45,8 +45,6 @@ namespace StarterAssets
         [SerializeField] private WallClimber _wallClimber;
         [Tooltip("Is the climbing mechanic enabled for the player to use")]
         [SerializeField] private bool _isClimbEnabled = true;
-        [Tooltip("Is the player within a valid context to climb")]
-        [SerializeField] private bool _isClimbAvailable = false;
         [Space(10)]
         [SerializeField] private LedgeType _detectedLedgeType = LedgeType.unset;
         [SerializeField] private Vector3 _ledgePosition;
@@ -126,6 +124,7 @@ namespace StarterAssets
         [SerializeField] private float _moderateLandingMinVelocity = 5f;
         [SerializeField] private float _heavyLandingMinVelocity = 9f;
         [SerializeField] private float _nastyLandingMinVelocity = 15f;
+        private bool _ignoreNextLandingSound = false;
 
         [Space(10)]
         [Tooltip("If the character is physically touching the ground or not at this instance. " +
@@ -443,9 +442,7 @@ namespace StarterAssets
         }
         private void InitBaseClimbStates()
         {
-            //Disable Ledge Detection temporarily
-            //_wallClimber.enabled = false;
-
+            
             //Change the movement state
             _movementState = MovementState.Climbing;
 
@@ -459,6 +456,10 @@ namespace StarterAssets
             //Clear any velocity utils
             _controller.SimpleMove(Vector3.zero);
             _controller.enabled = false;
+            
+            //Reset the Jump utilities
+            _verticalVelocity = 0;
+            UpdateLandingSound();
         }
 
 

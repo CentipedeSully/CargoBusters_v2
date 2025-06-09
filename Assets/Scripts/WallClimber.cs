@@ -88,16 +88,13 @@ public class WallClimber : MonoBehaviour
             if (_showDebug)
                 ClearMarkers();
 
+            _ledgePositions.Clear();
+
             if (IsObstacleDetected())
                 CreateForwardsObstacleAnalysis();
             
         }
             
-    }
-
-    private void LateUpdate()
-    {
-        _ledgePositions.Clear();
     }
 
 
@@ -334,21 +331,21 @@ public class WallClimber : MonoBehaviour
 
 
 
-        if (point.y <= _lowLedgeCutoff.position.y)
+        if (point.y <= _lowLedgeCutoff.localPosition.y)
         {
-            Debug.Log($"Low, {point.y}");
+            //Debug.Log($"Low, {point.y}\n At Or Below {_lowLedgeCutoff.localPosition.y}");
             return LedgeType.low;
         }
 
-        else if (point.y >= _HighLedgeCutoff.position.y)
+        else if (point.y >= _HighLedgeCutoff.localPosition.y)
         {
-            Debug.Log($"High, {point.y}");
+            //Debug.Log($"High, {point.y}\n At Or Above {_HighLedgeCutoff.localPosition.y}");
             return LedgeType.high;
         }
 
         else
         {
-            Debug.Log($"Mid, {point.y}");
+            //Debug.Log($"Mid, {point.y}\n Between {_lowLedgeCutoff.localPosition.y} and {_HighLedgeCutoff.localPosition.y}");
             return LedgeType.mid;
         }
     }
