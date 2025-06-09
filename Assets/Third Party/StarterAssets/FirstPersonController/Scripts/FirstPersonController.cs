@@ -42,7 +42,7 @@ namespace StarterAssets
         private float _rotationVelocity;
 
         [Header("Parkour")]
-        [SerializeField] LedgeDetectionManager _ledgeDetectManager;
+        [SerializeField] private WallClimber _wallClimber;
         [Tooltip("Is the climbing mechanic enabled for the player to use")]
         [SerializeField] private bool _isClimbEnabled = true;
         [Tooltip("Is the player within a valid context to climb")]
@@ -249,16 +249,6 @@ namespace StarterAssets
             _ledgePosition = Vector3.zero;
 		}
 
-        private void OnEnable()
-        {
-            _ledgeDetectManager.OnLedgeDetected += ListenForAvailableLedges;
-        }
-
-        private void OnDisable()
-        {
-            _ledgeDetectManager.OnLedgeDetected -= ListenForAvailableLedges;
-        }
-
         private void Update()
 		{
 			DetermineCharacterStates();
@@ -299,12 +289,6 @@ namespace StarterAssets
 
 
         //internals
-        private void ListenForAvailableLedges(LedgeType type, Vector3 position)
-        {
-            _detectedLedgeType = type;
-            _ledgePosition = position;
-        }
-
 		private void DetermineCharacterStates()
 		{
             if ( _movementState == MovementState.General)
@@ -460,7 +444,7 @@ namespace StarterAssets
         private void InitBaseClimbStates()
         {
             //Disable Ledge Detection temporarily
-            _ledgeDetectManager.enabled = false;
+            //_wallClimber.enabled = false;
 
             //Change the movement state
             _movementState = MovementState.Climbing;
@@ -480,9 +464,18 @@ namespace StarterAssets
 
         private void EnterClimb()
         {
-            //if the mechanic is enabled and we aren't already climbing (&& the detected ledge is still within reach)
-            if (_isClimbEnabled && _movementState != MovementState.Climbing && _ledgeDetectManager.IsLedgeStillValid(_detectedLedgeType, _ledgePosition))
+            //if the mechanic is enabled and we aren't already climbing
+            if (_isClimbEnabled && _movementState != MovementState.Climbing)
             {
+                //Check if a ledge is available to climb
+                if (!_wallClimber.IsLedgeAvailable())
+                    return;
+                else
+                {
+                    _ledgePosition = _wallClimber.GetClosestLedgePoint();
+                    _detectedLedgeType = _wallClimber.DetermineLedgeType(_ledgePosition);
+                }
+
                 //Detect Sprint-based Climb contexts
                 //valid contexts: Low, Mid, Special High Case
                 if (_isSprinting && _logicallyGrounded && _input.move.y == 1)
@@ -577,7 +570,6 @@ namespace StarterAssets
                     _transitionStartPoint = Vector3.negativeInfinity;
                     _transitionEndPoint = Vector3.negativeInfinity;
                     _controller.enabled = true;
-                    _ledgeDetectManager.enabled = true;
                     OnLowTransitionExit?.Invoke();
                 }
             }
@@ -596,7 +588,6 @@ namespace StarterAssets
                     _transitionStartPoint = Vector3.negativeInfinity;
                     _transitionEndPoint = Vector3.negativeInfinity;
                     _controller.enabled = true;
-                    _ledgeDetectManager.enabled = true;
                     OnMidTransitionExit?.Invoke();
                 }
             }
@@ -659,7 +650,6 @@ namespace StarterAssets
                             _transitionStartPoint = Vector3.negativeInfinity;
                             _transitionEndPoint = Vector3.negativeInfinity;
                             _controller.enabled = true;
-                            _ledgeDetectManager.enabled = true;
 
                             OnWallHangExited?.Invoke();
                         }
@@ -687,7 +677,6 @@ namespace StarterAssets
                             _transitionStartPoint = Vector3.negativeInfinity;
                             _transitionEndPoint = Vector3.negativeInfinity;
                             _controller.enabled = true;
-                            _ledgeDetectManager.enabled = true;
 
                             OnWallHangExited?.Invoke();
                         }

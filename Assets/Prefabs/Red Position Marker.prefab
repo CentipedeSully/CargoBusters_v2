@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 11256726993780445}
   - component: {fileID: 5148151696070376438}
   m_Layer: 8
-  m_Name: Debug Position Marker
+  m_Name: Red Position Marker
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -61,7 +61,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: f0838208dd229c74fa658009d388a376, type: 2}
+  - {fileID: 2100000, guid: ae7502a2d3677b34291f02a73f3aeee0, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

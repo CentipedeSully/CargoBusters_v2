@@ -2,6 +2,17 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
+using UnityEngine.UIElements;
+
+
+public enum LedgeType
+{
+    unset,
+    high,
+    mid,
+    low
+}
+
 
 public class WallClimber : MonoBehaviour
 {
@@ -18,12 +29,17 @@ public class WallClimber : MonoBehaviour
 
     [Header("Debug Visuals")]
     [SerializeField] private bool _showDebug = false;
-    [SerializeField] private GameObject _debugMarkerPrefab;
+    [SerializeField] private GameObject _wallMarkerPrefab;
     [SerializeField] private GameObject _standableMarkerPrefab;
+    [SerializeField] private GameObject _ledgeMarkerPrefab;
     [SerializeField] private Transform _debugMarkersContainer;
-    [SerializeField] private int _maxMarkers = 20;
+    [SerializeField] private int _maxWallMarkers = 20;
+    [SerializeField] private int _maxLedgeMarkers = 20;
     private List<GameObject> _debugMarkers = new();
     private List<GameObject> _debugStandableMarkers = new();
+    private List<GameObject> _debugLedgeMarkers = new();
+    private int _usedWallMarkers = 0;
+    private int _usedLedgeMarkers = 0;
  
     [Header("Forwards Wall Detection")]
     [Tooltip("Wall casting scans forwards in steps, from the player's max ledge reach down to a specified cutoff." +
@@ -44,8 +60,15 @@ public class WallClimber : MonoBehaviour
         "Emulates how far the player would transition onto the ledge")]
     [SerializeField] private float _OntoLedgeSpacing = 0.1f;
 
-
-    private RaycastHit[] _ledgeDetectionResults;
+    [Header("Ledge Point Detection")]
+    [Tooltip("The spherical space that must exist above an obstacle to be considered a ledgeable position")]
+    [SerializeField] private float _ledgeCastRadius = .1f;
+    [SerializeField] private Transform _ledgeLevelParent;
+    [Tooltip("Ledge Points at or beneath this height are considered low")]
+    [SerializeField] private Transform _lowLedgeCutoff;
+    [Tooltip("Ledge Points at or above this height are considered high")]
+    [SerializeField] private Transform _HighLedgeCutoff;
+    [SerializeField] private List<Vector3> _ledgePositions = new();
 
 
 
@@ -72,6 +95,11 @@ public class WallClimber : MonoBehaviour
             
     }
 
+    private void LateUpdate()
+    {
+        _ledgePositions.Clear();
+    }
+
 
 
 
@@ -83,9 +111,9 @@ public class WallClimber : MonoBehaviour
             //create a large amount of wall detection markers
             int markerCount = _debugMarkers.Count;
             GameObject latestCreatedObject;
-            while (markerCount < _maxMarkers)
+            while (markerCount < _maxWallMarkers)
             {
-                latestCreatedObject = Instantiate(_debugMarkerPrefab, _debugMarkersContainer);
+                latestCreatedObject = Instantiate(_wallMarkerPrefab, _debugMarkersContainer);
                 latestCreatedObject.SetActive(false);
                 _debugMarkers.Add(latestCreatedObject);
                 markerCount++;
@@ -98,6 +126,16 @@ public class WallClimber : MonoBehaviour
                 latestCreatedObject.SetActive(false);
                 _debugStandableMarkers.Add(latestCreatedObject);
             }
+
+            //create a large amount of ledge detection markers
+            markerCount = _debugLedgeMarkers.Count;
+            while (markerCount < _maxLedgeMarkers)
+            {
+                latestCreatedObject = Instantiate(_ledgeMarkerPrefab, _debugMarkersContainer);
+                latestCreatedObject.SetActive(false);
+                _debugLedgeMarkers.Add(latestCreatedObject);
+                markerCount++;
+            }
         }
         
     }
@@ -109,6 +147,12 @@ public class WallClimber : MonoBehaviour
 
         foreach (GameObject marker in _debugStandableMarkers)
             marker.SetActive(false);
+
+        foreach (GameObject marker in _debugLedgeMarkers)
+            marker.SetActive(false);
+
+        _usedLedgeMarkers = 0;
+        _usedWallMarkers = 0;
     }
 
     private void WallCastForwards(Vector3 start, float size)
@@ -125,11 +169,8 @@ public class WallClimber : MonoBehaviour
 
     private void CreateForwardsObstacleAnalysis() //performs a relatively expensive analysis of any obstacles ahead of the entitiy
     {
-        
-
         //Start detecting walls from the highest point first
         Vector3 currentCastOrigin = _maxLedgeReachOrigin.position;
-        int iterationCount = 1;
 
         while (currentCastOrigin.y > _lowestWallDetectionBound.position.y)
         {
@@ -137,25 +178,33 @@ public class WallClimber : MonoBehaviour
             WallCastForwards(currentCastOrigin, _capsuleRadius);
 
             //Get the detection that's closest to our origin
-            _detectedWallPoint = Utils.GetClosestPoint(_wallCastOrigin.position, _wallDetectionResults);
+            Vector3 closestPoint = Utils.GetClosestPoint(_wallCastOrigin.position, _wallDetectionResults);
 
-            
-
-            if (_showDebug)
+            //Validate the point before building our analysis
+            if (closestPoint.x != float.NegativeInfinity &&               //existence check
+                    closestPoint.y >= _lowestWallDetectionBound.position.y && //lower bound check
+                    closestPoint.y <= _maxLedgeReachOrigin.position.y)     //upper bound check
             {
-                //tag the hit with a debug marker, if it's a valid detection
-                if (_detectedWallPoint.x != float.NegativeInfinity &&               //existence check
-                    _detectedWallPoint.y >= _lowestWallDetectionBound.position.y && //lower bound check
-                    _detectedWallPoint.y <= _maxLedgeReachOrigin.position.y)     //upper bound check
-                {
-                    //make sure we have enough markers.
-                    if (iterationCount <= _debugMarkers.Count)
-                    {
-                        //tag the collision point with a marker
-                        _debugMarkers[iterationCount - 1].transform.position = _detectedWallPoint;
-                        _debugMarkers[iterationCount - 1].SetActive(true);
-                    }
+                //save the valid point
+                _detectedWallPoint = closestPoint;
 
+                //test point for ledgeability (meaning is it a grab point)
+                bool isLedge = IsPointLedgeable(_detectedWallPoint);
+
+                if (isLedge)
+                {
+                    //save the ledge point if it isn't already saved
+                    if (!_ledgePositions.Contains(_detectedWallPoint))
+                        _ledgePositions.Add(_detectedWallPoint);
+
+                    DetermineLedgeType(_detectedWallPoint);
+                }
+
+
+                //draw the debug visuals
+                if (_showDebug)
+                {
+                    /*Completed Standability Mechanic
                     //test the point for standability
                     bool isPointStandable = TestPointForStandability(_detectedWallPoint);
                     
@@ -171,16 +220,47 @@ public class WallClimber : MonoBehaviour
                         _debugStandableMarkers[0].transform.position = position;
                         _debugStandableMarkers[0].SetActive(true);
                     }
-                    
+                    */
+
+                    //reflect the visual as a ledge point if it's a ledge point
+                    if (isLedge)
+                    {
+                        //make sure we have enough free ledge markers
+                        if (_usedLedgeMarkers < _debugLedgeMarkers.Count)
+                        {
+                            //tag the collision point with a Ledge marker
+                            _debugLedgeMarkers[_usedLedgeMarkers].transform.position = _detectedWallPoint;
+                            _debugLedgeMarkers[_usedLedgeMarkers].SetActive(true);
+                            _usedLedgeMarkers++;
+                        }
+
+                        else Debug.LogWarning("Ran out of ledge Markers to display all detected ledges. Some may not be reflected visually");
+                    }
+
+                    //otherwise make its visual a regular wall point
+                    else
+                    {
+                        //make sure we have enough wall points
+                        if (_usedWallMarkers < _debugMarkers.Count)
+                        {
+                            //tag the collision point with a marker
+                            _debugMarkers[_usedWallMarkers].transform.position = _detectedWallPoint;
+                            _debugMarkers[_usedWallMarkers].SetActive(true);
+                            _usedWallMarkers++;
+
+                        }
+
+                        else Debug.LogWarning("Ran out of wall Markers to display all detected wall collisions. Some may not be reflected visually");
+                    }
                 }
+
+
+
             }
-            
+
 
             //setp the cast origin down for the next cast
             currentCastOrigin.y -= _verticalCastStepSize;
-
-            //increment iteration count, used by the debug marker collection
-            iterationCount++;
 
         }
 
@@ -203,17 +283,74 @@ public class WallClimber : MonoBehaviour
         else return false;
     }
 
-    private void TestPointForLedgeability(Vector3 point)
+    private bool IsPointLedgeable(Vector3 point)
     {
+        //apply the spacing
+        point += Vector3.up * _verticalLedgeSpacing * 2;
+        point += transform.TransformDirection(Vector3.forward * _OntoLedgeSpacing);
 
+        Collider[] hits = Physics.OverlapSphere(point,_ledgeCastRadius, _wallLayers);
+
+        if (hits.Length == 0)
+            return true;
+        else return false;
     }
 
 
 
 
     //Externals
+    public bool IsPointStandable(Vector3 point)
+    {
+        return TestPointForStandability(point);
+    }
+
+    public bool IsLedgeAvailable()
+    {
+        return _ledgePositions.Count > 0;
+    }
+
+    public Vector3 GetClosestLedgePoint()
+    {
+        if (_ledgePositions.Count < 1)
+            return Vector3.negativeInfinity;
+        else
+        {
+            return Utils.GetClosestPoint(transform.position, _ledgePositions);
+        }
+    }
+
+    public LedgeType DetermineLedgeType(Vector3 point)
+    {
+        if (point.y == float.NegativeInfinity)
+        {
+            Debug.LogError("Attempted to calculate a ledgeType for an invalid point. returning UNSET as the ledgeType");
+            return LedgeType.unset;
+        }
+
+        //make the ledge local
+        point = _ledgeLevelParent.InverseTransformPoint(point);
+        //Debug.Log($"Localized Point: {point}");
 
 
 
+        if (point.y <= _lowLedgeCutoff.position.y)
+        {
+            Debug.Log($"Low, {point.y}");
+            return LedgeType.low;
+        }
+
+        else if (point.y >= _HighLedgeCutoff.position.y)
+        {
+            Debug.Log($"High, {point.y}");
+            return LedgeType.high;
+        }
+
+        else
+        {
+            Debug.Log($"Mid, {point.y}");
+            return LedgeType.mid;
+        }
+    }
 
 }
