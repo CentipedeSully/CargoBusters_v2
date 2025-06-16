@@ -699,8 +699,9 @@ namespace StarterAssets
                         }
 
                         //trigger the climb over transition if the player [moves forwards + sprint btn]
-                        else if (_input.move.y > 0 && _input.sprint)
+                        else if (_input.move.y > 0 && _input.sprint && _wallClimber.IsPointStandable(_ledgePosition))
                         {
+                            //Check if the spot ahead is clear before triggering climb up
                             _currentPeekTime = 0;
                             _isClimbingOver = true;
                             OnWallClimbOverTriggered?.Invoke();
