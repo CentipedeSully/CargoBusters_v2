@@ -4669,7 +4669,6 @@ MonoBehaviour:
   _speedChangeRate: 10
   _wallClimber: {fileID: 5885216829670671797}
   _isClimbEnabled: 1
-  _isClimbAvailable: 0
   _detectedLedgeType: 0
   _ledgePosition: {x: 0, y: 0, z: 0}
   _transitionType: 0
@@ -4946,7 +4945,8 @@ MonoBehaviour:
   _debugMarkersContainer: {fileID: 71049635}
   _maxWallMarkers: 100
   _maxLedgeMarkers: 20
-  _verticalCastStepSize: 0.05
+  _clearVisualGizmosTick: 0.25
+  _verticalCastStepSize: 0.5
   _lowestWallDetectionBound: {fileID: 1979778962}
   _forwardsWallCastDistance: 1
   _detectedWallPoint: {x: 0, y: 0, z: 0}
@@ -4957,6 +4957,9 @@ MonoBehaviour:
   _lowLedgeCutoff: {fileID: 598438239}
   _HighLedgeCutoff: {fileID: 22132175}
   _ledgePositions: []
+  _castSize: 0.1
+  _castDistance: 0.33
+  _normalCastDistance: 1
 --- !u!82 &6002500488490234323
 AudioSource:
   m_ObjectHideFlags: 0

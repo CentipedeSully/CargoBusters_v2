@@ -40,6 +40,8 @@ public class WallClimber : MonoBehaviour
     private List<GameObject> _debugLedgeMarkers = new();
     private int _usedWallMarkers = 0;
     private int _usedLedgeMarkers = 0;
+    private List<Vector3> _visualLedgePoints = new();
+    [SerializeField] private float _clearVisualGizmosTick = .5f;
  
     [Header("Forwards Wall Detection")]
     [Tooltip("Wall casting scans forwards in steps, from the player's max ledge reach down to a specified cutoff." +
@@ -70,7 +72,10 @@ public class WallClimber : MonoBehaviour
     [SerializeField] private Transform _HighLedgeCutoff;
     [SerializeField] private List<Vector3> _ledgePositions = new();
 
-
+    [Header("Ledge Area Scanning")]
+    [SerializeField] private float _castSize = .25f;
+    [SerializeField] private float _castDistance = .33f;
+    [SerializeField] private float _normalCastDistance = 1;
 
 
 
@@ -79,6 +84,7 @@ public class WallClimber : MonoBehaviour
     private void Start()
     {
         PopulateDebugMarkers();
+        InvokeRepeating(nameof(ClearVisualGizmos), _clearVisualGizmosTick, _clearVisualGizmosTick);
     }
 
     private void Update()
@@ -97,10 +103,24 @@ public class WallClimber : MonoBehaviour
             
     }
 
+    private void OnDrawGizmos()
+    {
+        Gizmos.color = Color.green;
+        foreach (Vector3 point in _visualLedgePoints)
+        {
+            Gizmos.DrawWireSphere(point, _castSize);
+        }
+    }
+
 
 
 
     //Internals
+    private void ClearVisualGizmos()
+    {
+        _visualLedgePoints.Clear();
+    }
+
     private void PopulateDebugMarkers()
     {
         if (_showDebug)
@@ -219,6 +239,7 @@ public class WallClimber : MonoBehaviour
                     }
                     */
 
+                    
                     //reflect the visual as a ledge point if it's a ledge point
                     if (isLedge)
                     {
@@ -249,6 +270,7 @@ public class WallClimber : MonoBehaviour
 
                         else Debug.LogWarning("Ran out of wall Markers to display all detected wall collisions. Some may not be reflected visually");
                     }
+                    
                 }
 
 
@@ -261,6 +283,21 @@ public class WallClimber : MonoBehaviour
 
         }
 
+    }
+
+    public Vector3 GetFaceNormal(Vector3 point, Vector3 castDirection)
+    {
+        RaycastHit detection;
+        Vector3 startPoint = point + (-castDirection.normalized * .25f); //Move outwards a bit to not start the cast directly on the wall
+        Physics.Raycast(startPoint, castDirection, out detection, _normalCastDistance, _wallLayers);
+        
+        if (detection.collider != null)
+        {
+            //Debug.DrawLine(point, point + detection.normal.normalized * 4, Color.magenta, .5f);
+            return detection.normal.normalized;
+        }
+            
+        else return Vector3.negativeInfinity;
     }
 
     private bool TestPointForStandability(Vector3 point)
@@ -293,7 +330,103 @@ public class WallClimber : MonoBehaviour
         else return false;
     }
 
+    private bool IsPointLedgeable(Vector3 point, Vector3 forwardsDirection)
+    {
+        //apply the spacing
+        point += Vector3.up * _verticalLedgeSpacing * 2;
+        point += forwardsDirection.normalized * _OntoLedgeSpacing;
 
+        Collider[] hits = Physics.OverlapSphere(point, _ledgeCastRadius, _wallLayers);
+
+        if (hits.Length == 0)
+            return true;
+        else return false;
+    }
+
+    public List<Vector3> ScanForLedgePointsAlongLine(Vector3 startPoint, Vector3 endPoint, Vector3 forwardsDirection, int numberOfCasts)
+    {
+        //ignore invalid points
+        if (startPoint.x == float.NegativeInfinity || endPoint.x == float.NegativeInfinity || forwardsDirection.x == float.NegativeInfinity)
+            return new List<Vector3>();
+
+        int currentCastsMade = 0;
+        List<Vector3> detectedLedges = new();
+        Vector3 currentCastPoint;
+        RaycastHit castDetection;
+        Collider[] overlapDetections;
+        bool isLedge = false;
+        Vector3 hitPoint = Vector3.negativeInfinity;
+
+
+
+        while (currentCastsMade < numberOfCasts)
+        {
+            //Debug.Log($"Entered Scan Interaion loop. Iteration: {currentCastsMade}");
+
+            //reset the detection util
+            isLedge = false;
+            float time = (float)currentCastsMade / (float)numberOfCasts;
+            hitPoint = Vector3.negativeInfinity;
+
+            //for each iteration, move in even steps from the startPoint to the endPoint, in a straight line
+            currentCastPoint = Vector3.Lerp(startPoint, endPoint, time);
+
+            overlapDetections = Physics.OverlapSphere(currentCastPoint, _castSize, _wallLayers);
+            Physics.SphereCast(currentCastPoint, _castSize, forwardsDirection.normalized, out castDetection, _castDistance, _wallLayers);
+            //Debug.DrawLine(currentCastPoint, currentCastPoint + (forwardsDirection * _castDistance * 5), Color.magenta, .5f);
+
+            
+
+            //first check the overlap. Was anything detected?
+            if (overlapDetections.Length > 0)
+            {
+                //make sure the point is a ledge
+                hitPoint = overlapDetections[0].ClosestPoint(currentCastPoint);
+                if (IsPointLedgeable(hitPoint, forwardsDirection))
+                {
+                    //set for drawing the debug points later
+                    isLedge = true;
+
+
+                    //add the point if it isn't already added
+                    if (!detectedLedges.Contains(hitPoint))
+                        detectedLedges.Add(hitPoint);
+
+                }
+            }
+
+            //did we detect anything with the cast?
+            else if (castDetection.collider != null)
+            {
+                //make sure the point is a ledge
+                hitPoint = castDetection.point;
+                if (IsPointLedgeable(hitPoint, forwardsDirection))
+                {
+                    //set for drawing the debug points later
+                    isLedge = true;
+
+
+                    //add the point if it isn't already added
+                    if (!detectedLedges.Contains(hitPoint))
+                        detectedLedges.Add(hitPoint);
+
+                }
+            }
+
+            if (_showDebug && hitPoint.x != float.NegativeInfinity && isLedge)
+            {
+                if (!_visualLedgePoints.Contains(hitPoint))
+                    _visualLedgePoints.Add(hitPoint);
+            }
+
+            //update our step
+            currentCastsMade++;
+
+        }
+
+        return detectedLedges;
+        
+    }
 
 
     //Externals

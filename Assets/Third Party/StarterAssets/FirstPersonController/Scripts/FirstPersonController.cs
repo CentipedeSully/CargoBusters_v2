@@ -1,5 +1,4 @@
-﻿using System;
-using System.Net;
+﻿using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
@@ -87,6 +86,9 @@ namespace StarterAssets
         [SerializeField] private float _peekOffset = 1;
         private float _currentPeekTime = 0;
         private float _currentPeekOffset = 0;
+        private Vector3 _wallNormal;
+        private Vector3 _wallRightDirection;
+        private List<Vector3> _nearbyLedgePoints = new();
 
 
 
@@ -475,6 +477,11 @@ namespace StarterAssets
                 {
                     _ledgePosition = _wallClimber.GetClosestLedgePoint();
                     _detectedLedgeType = _wallClimber.DetermineLedgeType(_ledgePosition);
+                    _wallNormal = _wallClimber.GetFaceNormal(_ledgePosition, transform.TransformDirection(Vector3.forward));
+                    
+                    if (_wallNormal.y == float.NegativeInfinity)
+                        Debug.LogWarning("Failed to catch the ledge's normal face. Therefore not calculating the ledge's horizontal move direction line");
+                    else _wallRightDirection = Vector3.Cross(_wallNormal, Vector3.down);
                 }
 
                 //Detect Sprint-based Climb contexts
@@ -544,6 +551,8 @@ namespace StarterAssets
             _isWallHanging = false;
             _currentEnterHangTime = 0;
 
+            
+
             //reset the input delay setting, to avoid unintended, auto ledge climbing
             _isWallHangInputDelayComplete = false;
             
@@ -608,8 +617,9 @@ namespace StarterAssets
                     {
                         _currentEnterHangTime = 0;
                         _isWallHanging = true;
-                        OnWallHangEntered?.Invoke();
                         _originalHangPosition = transform.position;
+                        OnWallHangEntered?.Invoke();
+                        
 
                         // provide the player some time to release the climb control
                         // in case they only want to ledge hang, or if they fell into it
@@ -656,10 +666,11 @@ namespace StarterAssets
                         }
                     }
 
-                    //drop off the ledge if the player [moves backwards + sprint btn]
+                    
                     //Only after the input delay completes
                     else if (_isWallHangInputDelayComplete)
                     {
+                        //drop off the ledge if the player [moves backwards + sprint btn]
                         if (_input.move.y < 0 && _input.sprint)
                         {
                             _isClimbingOver = false;
@@ -680,19 +691,19 @@ namespace StarterAssets
                             _controller.enabled = true;
 
                             OnWallHangExited?.Invoke();
+                            return;
                         }
 
                         //trigger the climb over transition if the player [moves forwards + sprint btn]
-                        //Only after the input delay completes
                         else if (_input.move.y > 0 && _input.sprint)
                         {
                             _isClimbingOver = true;
                             OnWallClimbOverTriggered?.Invoke();
+                            return;
                         }
 
                         //pull the player up to peek over the ledge if moving forwards
-                        //only after the input delay
-                        else if (_input.move.y > 0)
+                        if (_input.move.y > 0)
                         {
                             //are we NOT YET at the peak peek?
                             if (_currentPeekTime < _peekDuration)
@@ -708,7 +719,6 @@ namespace StarterAssets
                         }
 
                         //decline the player from the ledge if not moving forwards (downwards OR non-input)
-                        //only after the input delay
                         else if (_input.move.y <= 0)
                         {
                             //are we NOT YET at the peak peek?
@@ -723,6 +733,24 @@ namespace StarterAssets
                                 _currentPeekTime = 0;
                             }
                         }
+
+                        //visualize the player's current Hang Position
+                        Debug.DrawLine(_originalHangPosition, _originalHangPosition + _wallNormal.normalized * 4, Color.blue, .5f);
+
+                        //detect for adjacent ledgePoints
+                        Vector3 startScanPoint = _ledgePosition + (-_wallRightDirection * 1f); // to the left of the origin by .5f  
+                        Vector3 endScanPoint = _ledgePosition + (_wallRightDirection * 1f); // to the right of the origin by .5f
+                        
+                        //draw start boundary
+                        Debug.DrawLine(startScanPoint, startScanPoint + _wallNormal.normalized * 4, Color.yellow, .5f);
+                        //draw end boundary
+                        Debug.DrawLine(endScanPoint, endScanPoint + _wallNormal.normalized * 4, Color.red, .5f);
+
+                        //Fix this: Why are no ledge points being detected?
+                        _nearbyLedgePoints = _wallClimber.ScanForLedgePointsAlongLine(startScanPoint, endScanPoint, -_wallNormal.normalized, 10);
+                        Debug.Log($"Detected Ledge Points: {_nearbyLedgePoints.Count}");
+
+
                     }
                     
 
