@@ -3991,6 +3991,11 @@ PrefabInstance:
       propertyPath: m_Convex
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7436408284486996600, guid: 09aade0ecefd01e4b8f7661acf64f5c2,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 8345070699079395522, guid: 09aade0ecefd01e4b8f7661acf64f5c2,
         type: 3}
       propertyPath: m_RootOrder
@@ -4685,6 +4690,8 @@ MonoBehaviour:
   _highGrabCooldownDuration: 1
   _peekDuration: 0.33
   _peekOffset: 1.25
+  _wallHangClimbSpeed: 0.5
+  _detectedClimbingPoints: []
   _cameraHeightTransitionSpeed: 2
   _isCrouched: 0
   _crouchHeight: 1

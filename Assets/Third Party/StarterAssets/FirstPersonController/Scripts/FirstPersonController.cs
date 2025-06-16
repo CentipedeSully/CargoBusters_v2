@@ -89,7 +89,10 @@ namespace StarterAssets
         private Vector3 _wallNormal;
         private Vector3 _wallRightDirection;
         private List<Vector3> _nearbyLedgePoints = new();
-
+        private Vector3 _horizontalClimbDirection = Vector3.zero;
+        [SerializeField] private float _wallHangClimbSpeed = 1;
+        [SerializeField] private List<Vector3> _detectedClimbingPoints = new();
+        private List<Vector3> _tempClimbPointsList = new();
 
 
 
@@ -673,6 +676,7 @@ namespace StarterAssets
                         //drop off the ledge if the player [moves backwards + sprint btn]
                         if (_input.move.y < 0 && _input.sprint)
                         {
+                            _currentPeekTime = 0;
                             _isClimbingOver = false;
                             _isWallHanging = false;
                             _isHighGrabReady = false;
@@ -697,6 +701,7 @@ namespace StarterAssets
                         //trigger the climb over transition if the player [moves forwards + sprint btn]
                         else if (_input.move.y > 0 && _input.sprint)
                         {
+                            _currentPeekTime = 0;
                             _isClimbingOver = true;
                             OnWallClimbOverTriggered?.Invoke();
                             return;
@@ -734,6 +739,42 @@ namespace StarterAssets
                             }
                         }
 
+                        //Move while hanging if moving horizontally
+                        if (_input.move.x > 0.1f || _input.move.x < -0.1f)
+                        {
+
+                            //identify the direction
+                            if (_input.move.x > 0)
+                                _horizontalClimbDirection = -_wallRightDirection;
+                            else _horizontalClimbDirection = _wallRightDirection;
+
+
+                            //Move in the movement direction, if there's a ledge in that direction
+                            if (_wallClimber.IsHorizontalClimbingAvailable(_horizontalClimbDirection,_wallHangClimbSpeed,-_wallNormal,_ledgePosition,out _tempClimbPointsList))
+                            {
+                                
+                                //accept all the new ledge points
+                                foreach (Vector3 point in _tempClimbPointsList)
+                                {
+                                    if (!_detectedClimbingPoints.Contains(point))
+                                        _detectedClimbingPoints.Add(point);
+                                }
+
+                                //Move in the climb direction
+                                Vector3 movement = _horizontalClimbDirection * _wallHangClimbSpeed * Time.deltaTime;
+                                transform.position += movement;
+
+                                //update the climb utilities
+                                _ledgePosition += movement;
+                                _originalHangPosition += movement;
+                                _transitionStartPoint += movement;
+                                _transitionEndPoint += movement;
+                            }
+
+
+                        }
+
+                        /* Old Ledge Scan
                         //visualize the player's current Hang Position
                         Debug.DrawLine(_originalHangPosition, _originalHangPosition + _wallNormal.normalized * 4, Color.blue, .5f);
 
@@ -749,6 +790,7 @@ namespace StarterAssets
                         //Fix this: Why are no ledge points being detected?
                         _nearbyLedgePoints = _wallClimber.ScanForLedgePointsAlongLine(startScanPoint, endScanPoint, -_wallNormal.normalized, 10);
                         Debug.Log($"Detected Ledge Points: {_nearbyLedgePoints.Count}");
+                        */
 
 
                     }

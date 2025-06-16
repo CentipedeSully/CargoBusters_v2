@@ -76,6 +76,8 @@ public class WallClimber : MonoBehaviour
     [SerializeField] private float _castSize = .25f;
     [SerializeField] private float _castDistance = .33f;
     [SerializeField] private float _normalCastDistance = 1;
+    private List<Vector3> _horizontalClimbLedgePoints = new();
+    private RaycastHit _horizonClimbBodyDetection;
 
 
 
@@ -206,7 +208,7 @@ public class WallClimber : MonoBehaviour
                 _detectedWallPoint = closestPoint;
 
                 //test point for ledgeability (meaning is it a grab point)
-                bool isLedge = IsPointLedgeable(_detectedWallPoint);
+                bool isLedge = IsWallPointLedgeable(_detectedWallPoint);
 
                 if (isLedge)
                 {
@@ -317,7 +319,7 @@ public class WallClimber : MonoBehaviour
         else return false;
     }
 
-    private bool IsPointLedgeable(Vector3 point)
+    private bool IsWallPointLedgeable(Vector3 point)
     {
         //apply the spacing
         point += Vector3.up * _verticalLedgeSpacing * 2;
@@ -330,7 +332,7 @@ public class WallClimber : MonoBehaviour
         else return false;
     }
 
-    private bool IsPointLedgeable(Vector3 point, Vector3 forwardsDirection)
+    private bool IsWallPointLedgeable(Vector3 point, Vector3 forwardsDirection)
     {
         //apply the spacing
         point += Vector3.up * _verticalLedgeSpacing * 2;
@@ -382,7 +384,7 @@ public class WallClimber : MonoBehaviour
             {
                 //make sure the point is a ledge
                 hitPoint = overlapDetections[0].ClosestPoint(currentCastPoint);
-                if (IsPointLedgeable(hitPoint, forwardsDirection))
+                if (IsWallPointLedgeable(hitPoint, forwardsDirection))
                 {
                     //set for drawing the debug points later
                     isLedge = true;
@@ -400,7 +402,7 @@ public class WallClimber : MonoBehaviour
             {
                 //make sure the point is a ledge
                 hitPoint = castDetection.point;
-                if (IsPointLedgeable(hitPoint, forwardsDirection))
+                if (IsWallPointLedgeable(hitPoint, forwardsDirection))
                 {
                     //set for drawing the debug points later
                     isLedge = true;
@@ -428,6 +430,31 @@ public class WallClimber : MonoBehaviour
         
     }
 
+    public bool IsHorizontalClimbingAvailable(Vector3 climbDirection, float castDistance, Vector3 forwardsDirection, Vector3 ledgeOrigin, out List<Vector3> foundLedgePoints)
+    {
+        
+        //First determine if there's space for the player's body to move in the climb direction
+        Physics.CapsuleCast(_bottomPlayerCapsuleOrigin.position, _topPlayerCapsuleOrigin.position, _capsuleRadius, climbDirection,out _horizonClimbBodyDetection, castDistance, _wallLayers);
+        _horizontalClimbLedgePoints.Clear();
+        foundLedgePoints = _horizontalClimbLedgePoints; //we're doing this to avoid creating the creation of new lists. This might be executed each frame
+
+        //return false if any collider was detected
+        if (_horizonClimbBodyDetection.collider!= null)
+            return false;
+
+        //Next, determine if there's any ledgePoints within the castDistance's span
+        _horizontalClimbLedgePoints = ScanForLedgePointsAlongLine(ledgeOrigin, ledgeOrigin + climbDirection.normalized * castDistance, forwardsDirection, 3);
+
+        if (_horizontalClimbLedgePoints.Count > 0)
+        {
+            Debug.Log($"found LedgePoints while checking wallClimb avaialability: {_horizontalClimbLedgePoints.Count}");
+            foundLedgePoints = _horizontalClimbLedgePoints;
+            return true;
+        }
+            
+        else return false;
+
+    }
 
     //Externals
     public bool IsPointStandable(Vector3 point)
