@@ -4687,7 +4687,7 @@ MonoBehaviour:
   _wallHangInputDelay: 0.5
   _isWallHanging: 0
   _isHighGrabReady: 1
-  _highGrabCooldownDuration: 1
+  _highGrabCooldownDuration: 0.5
   _peekDuration: 0.33
   _peekOffset: 1.25
   _wallHangClimbSpeed: 0.5

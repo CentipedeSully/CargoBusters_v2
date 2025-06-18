@@ -91,12 +91,13 @@ namespace StarterAssets
         private List<Vector3> _nearbyLedgePoints = new();
         private Vector3 _horizontalClimbDirection = Vector3.zero;
         [SerializeField] private float _wallHangClimbSpeed = 1;
-        [SerializeField] private List<Vector3> _detectedClimbingPoints = new();
+        private List<Vector3> _detectedClimbingPoints = new();
         private List<Vector3> _tempClimbPointsList = new();
+        [SerializeField] private float _wallJumpDistance = 1;
 
 
 
-        [Header("Crouching")]
+        [Header("Crouching & Sliding")]
         [SerializeField] private float _cameraHeightTransitionSpeed = 2.0f;
         [SerializeField] private bool _isCrouched = false;
         private bool _isCrouchTransitioning = false;
@@ -106,11 +107,18 @@ namespace StarterAssets
         [SerializeField] private bool _isUncrouchAvailable = true;
         [SerializeField] private float _crouchCastTweak;
         [SerializeField] private DrawRectGizmo _crouchGizmo;
+        [SerializeField] private bool _isSliding = false;
+        [SerializeField] private float _slideSpeedChangeRate = 2;
+        [Tooltip("If our speed falls below this value, we'll automatically stop sliding")]
+        [SerializeField] private float _minSlideSpeed = .2f;
+        private Vector3 _slideDirection;
 
 
         [Header("Jumping & Falling")]
         [Tooltip("The height the player can jump")]
         [SerializeField] private float _jumpHeight = 1.2f;
+        [Tooltip("How slowly will our the horizontal speed decay while airborne")]
+        [SerializeField] private float _airSpeedChangeRate = .1f;
         [Tooltip("The character uses its own gravity value. The engine default is -9.81f")]
         [SerializeField] private float _gravity = -15.0f;
         [Tooltip("Time required to pass before being able to jump again. Set to 0f to instantly jump again")]
@@ -130,6 +138,7 @@ namespace StarterAssets
         [SerializeField] private float _heavyLandingMinVelocity = 9f;
         [SerializeField] private float _nastyLandingMinVelocity = 15f;
         private bool _ignoreNextLandingSound = false;
+        private Vector3 _jumpAssistForce;
 
         [Space(10)]
         [Tooltip("If the character is physically touching the ground or not at this instance. " +
@@ -192,6 +201,8 @@ namespace StarterAssets
 		public event MovementEvent OnRunExit;
 		public event MovementEvent OnCrouchEnter;
 		public event MovementEvent OnCrouchExit;
+        public event MovementEvent OnSlideEnter;
+        public event MovementEvent OnSlideExit;
 
         public event MovementEvent OnLowTransitionEnter;
         public event MovementEvent OnLowTransitionExit;
@@ -319,6 +330,8 @@ namespace StarterAssets
 				{
 					_fallTimeoutCompleted = false;
 					_logicallyGrounded = true;
+                    _jumpAssistForce = Vector3.zero; //clear the jump assist force, if one is active
+
                     OnLand?.Invoke(_landing);
                 }
 
@@ -389,9 +402,10 @@ namespace StarterAssets
         }
         private void Crouch()
         {
-            //first, if we're crouching, make sure something isnt above to prevent us from standing up
+            //first, update the crouch states
             if (_isCrouched)
             {
+                //detect if uncrouch is possible
                 Vector3 playerMiddle = transform.position + Vector3.up * (_originalPlayerHeight / 2 + 0.01f);
                 Vector3 castSize = new Vector3((_controller.radius + _crouchCastTweak ) / 2, (_originalPlayerHeight) / 2, (_controller.radius + _crouchCastTweak) / 2);
                 Collider[] detectedColliders = Physics.OverlapBox(playerMiddle, castSize, transform.rotation, _groundLayers);
@@ -405,8 +419,33 @@ namespace StarterAssets
 
             }
 
+            Vector3 horizontalVelocity = new Vector3(_controller.velocity.x, 0, _controller.velocity.z);
+
+            // check if we need to leave the slide state
+            if (_isSliding)
+            {
+                //leave the slide state if any of the following are met:
+                // - we left the ground
+                // - our velocity reached our "too slow" threshold
+                // - we've somehow left the crouch state without leaving the slide state
+                if (!_logicallyGrounded || horizontalVelocity.magnitude < _minSlideSpeed || !_isCrouched )
+                {
+                    _isSliding = false;
+                    OnSlideExit?.Invoke();
+                }   
+            }
+
+            //check if we need to ENTER the slide state
+            else if (!_isSliding && _input.crouch && _logicallyGrounded && horizontalVelocity.magnitude > _moveSpeed)
+            {
+                _isSliding = true;
+                _slideDirection = transform.TransformDirection(Vector3.forward);
+                OnSlideEnter?.Invoke();
+            } 
+
 
             //now determine the core crouch state
+            //if we arent crouched && crouch isn't disabled && [crouch btn]
             if (!_isCrouched && _isCrouchAvailable && _input.crouch)
             {
                 _isCrouched = true;
@@ -415,8 +454,20 @@ namespace StarterAssets
                 _controller.height = _crouchHeight;
                 _controller.center = Vector3.up * _crouchHeight / 2;
 
-                OnCrouchEnter?.Invoke();
+                OnCrouchEnter?.Invoke(); //Sliding is a substate of Crouch. Enter crouch BEFORE Enter Slide
+
+                Vector3 nonVerticalVelocity = new Vector3(_controller.velocity.x, 0, _controller.velocity.z);
+
+                //enter a slide if our velocity is beyond the walk threshold
+                if (nonVerticalVelocity.magnitude > _moveSpeed)
+                {
+                    _isSliding = true;
+                    _slideDirection = transform.TransformDirection(Vector3.forward);
+                    OnSlideEnter?.Invoke();
+                }
             }
+
+            //else if we ARE crouched && we have space to raise && [released crouch btn OR lost the crouch ability]
             else if (_isCrouched && (!_input.crouch || !_isCrouchAvailable) && _isUncrouchAvailable) //make sure we're actually able to uncrouch, too
             {
                 _isCrouched = false;
@@ -425,7 +476,17 @@ namespace StarterAssets
                 _controller.height = _originalPlayerHeight;
                 _controller.center = Vector3.up * 0.93f;
 
-                OnCrouchExit?.Invoke();
+
+                //exit our slide if we're sliding
+                if (_isSliding)
+                {
+                    _isSliding = false;
+                    OnSlideExit?.Invoke();
+                }
+
+                OnCrouchExit?.Invoke(); //Sliding is a substate of Crouch. Exit crouch AFTER exiting Slide
+
+
             }
 
         }
@@ -775,23 +836,47 @@ namespace StarterAssets
 
                         }
 
-                        /* Old Ledge Scan
-                        //visualize the player's current Hang Position
-                        Debug.DrawLine(_originalHangPosition, _originalHangPosition + _wallNormal.normalized * 4, Color.blue, .5f);
+                        //jump if jump is pressed
+                        if (_input.jump)
+                        {
 
-                        //detect for adjacent ledgePoints
-                        Vector3 startScanPoint = _ledgePosition + (-_wallRightDirection * 1f); // to the left of the origin by .5f  
-                        Vector3 endScanPoint = _ledgePosition + (_wallRightDirection * 1f); // to the right of the origin by .5f
-                        
-                        //draw start boundary
-                        Debug.DrawLine(startScanPoint, startScanPoint + _wallNormal.normalized * 4, Color.yellow, .5f);
-                        //draw end boundary
-                        Debug.DrawLine(endScanPoint, endScanPoint + _wallNormal.normalized * 4, Color.red, .5f);
+                            //exit the climb state
+                            _isClimbingOver = false;
+                            _isWallHanging = false;
+                            _isHighGrabReady = false;
 
-                        //Fix this: Why are no ledge points being detected?
-                        _nearbyLedgePoints = _wallClimber.ScanForLedgePointsAlongLine(startScanPoint, endScanPoint, -_wallNormal.normalized, 10);
-                        Debug.Log($"Detected Ledge Points: {_nearbyLedgePoints.Count}");
-                        */
+                            //cancel any previous ticking input delays
+                            CancelInvoke(nameof(CompleteWallHangInputDelay));
+
+                            //trigger highgrab cooldown
+                            Invoke(nameof(ReadyHighGrabCooldown), _highGrabCooldownDuration);
+
+                            //leave the climbing state and fall
+                            _movementState = MovementState.General;
+                            _transitionType = LedgeType.unset;
+                            _transitionStartPoint = Vector3.negativeInfinity;
+                            _transitionEndPoint = Vector3.negativeInfinity;
+                            _controller.enabled = true;
+
+                            OnWallHangExited?.Invoke();
+
+                            //Trigger a jump manually 
+                            //reset the timer
+                            _jumpTimeoutCompleted = false;
+
+                            // the square root of H * -2 * G = how much velocity needed to reach desired height
+                            _verticalVelocity = Mathf.Sqrt(_jumpHeight * -2f * _gravity);
+                            
+
+                            _jumpAssistForce = transform.TransformDirection(Vector3.forward) * _wallJumpDistance;
+
+                            //signal the jump
+                            OnJump?.Invoke();
+
+                            //reset the input. Doesn't reset on its own
+                            _input.jump = false;
+
+                        }
 
 
                     }
@@ -879,11 +964,10 @@ namespace StarterAssets
             // set target speed based on sprint/crouch/standing state
             float targetSpeed = CalculateTargetSpeed();
 
-            // a simplistic acceleration and deceleration designed to be easy to remove, replace, or iterate upon
-
             // note: Vector2's == operator uses approximation so is not floating point error prone, and is cheaper than magnitude
-            // if there is no input, set the target speed to 0
-            if (_input.move == Vector2.zero) targetSpeed = 0.0f;
+            // cancel the target speed if no directional input is detected
+            if (_input.move == Vector2.zero) 
+                targetSpeed = 0.0f;
 
             // a reference to the players current horizontal velocity
             float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
@@ -892,14 +976,41 @@ namespace StarterAssets
             float inputMagnitude = _input.analogMovement ? _input.move.magnitude : 1f;
 
             // accelerate or decelerate to target speed
-            if (currentHorizontalSpeed < targetSpeed - speedOffset || currentHorizontalSpeed > targetSpeed + speedOffset)
+            if ((currentHorizontalSpeed < targetSpeed - speedOffset || currentHorizontalSpeed > targetSpeed + speedOffset))
             {
-                // creates curved result rather than a linear one giving a more organic speed change
-                // note T in Lerp is clamped, so we don't need to clamp our speed
-                _speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed * inputMagnitude, Time.deltaTime * _speedChangeRate);
+                //use the slide speed change rate if sliding
+                if (_isSliding)
+                {
+                    // creates curved result rather than a linear one giving a more organic speed change
+                    // note T in Lerp is clamped, so we don't need to clamp our speed
+                    _speed = Mathf.Lerp(currentHorizontalSpeed, 0, Time.deltaTime * _slideSpeedChangeRate);
 
-                // round speed to 3 decimal places
-                _speed = Mathf.Round(_speed * 1000f) / 1000f;
+                    // round speed to 3 decimal places
+                    _speed = Mathf.Round(_speed * 1000f) / 1000f;
+                }
+
+                //use the air speed change rate if not grounded
+                if (!_logicallyGrounded)
+                {
+                    // creates curved result rather than a linear one giving a more organic speed change
+                    // note T in Lerp is clamped, so we don't need to clamp our speed
+                    _speed = Mathf.Lerp(currentHorizontalSpeed, 0, Time.deltaTime * _airSpeedChangeRate);
+
+                    // round speed to 3 decimal places
+                    _speed = Mathf.Round(_speed * 1000f) / 1000f;
+                }
+
+                //otherwise use the general speed change rate
+                else
+                {
+                    // creates curved result rather than a linear one giving a more organic speed change
+                    // note T in Lerp is clamped, so we don't need to clamp our speed
+                    _speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed * inputMagnitude, Time.deltaTime * _speedChangeRate);
+
+                    // round speed to 3 decimal places
+                    _speed = Mathf.Round(_speed * 1000f) / 1000f;
+                }
+                
             }
             else
             {
@@ -914,8 +1025,10 @@ namespace StarterAssets
         {
             if (_isSprinting)
                 return _sprintSpeed;
+
             else if (_isCrouched || _isCrouchTransitioning)
                 return _cameraHeightTransitionSpeed;
+
             else return _moveSpeed;
         }
         private void ManageJump()
@@ -976,7 +1089,21 @@ namespace StarterAssets
         private void MoveCharacter()
 		{
             if (_movementState == MovementState.General)
-                _controller.Move(_moveDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+            {
+                if (_isSliding)
+                    _controller.Move(_slideDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+                else
+                {
+                    Vector3 combinedHorizontal = ((_moveDirection.normalized * _speed) + _jumpAssistForce) * Time.deltaTime;
+                    _controller.Move(combinedHorizontal + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+                }
+                    
+
+                
+
+            }
+               
+              
         }
 
 
