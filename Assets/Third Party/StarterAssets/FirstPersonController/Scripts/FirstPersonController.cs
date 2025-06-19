@@ -25,6 +25,10 @@ namespace StarterAssets
 
 	public class FirstPersonController : MonoBehaviour
 	{
+        [Header("References")]
+        [SerializeField] private Transform _playerCapsuleTop;
+        [SerializeField] private Transform _playerCapsuleBottom;
+
         [Header("Core Movement")]
         [SerializeField] private MovementState _movementState = MovementState.Unset;
         [SerializeField] private float _moveSpeed = 4.0f;
@@ -93,7 +97,7 @@ namespace StarterAssets
         [SerializeField] private float _wallHangClimbSpeed = 1;
         private List<Vector3> _detectedClimbingPoints = new();
         private List<Vector3> _tempClimbPointsList = new();
-        [SerializeField] private float _wallJumpDistance = 1;
+        [SerializeField] private float _wallJumpStrength = 1;
 
 
 
@@ -109,6 +113,10 @@ namespace StarterAssets
         [SerializeField] private DrawRectGizmo _crouchGizmo;
         [SerializeField] private bool _isSliding = false;
         [SerializeField] private float _slideSpeedChangeRate = 2;
+        [Tooltip("If our speed falls below this, use the harsh speed change rate to increase slide friction and start decelerating the slide faster")]
+        [SerializeField] private float _rapidSlideReductionThreshold = .5f;
+        [Tooltip("The value used to increase the slide friction at the tail end of a slide. Used to make sliding end more naturally")]
+        [SerializeField] private float _harshSlideSpeedChangeRate = 2;
         [Tooltip("If our speed falls below this value, we'll automatically stop sliding")]
         [SerializeField] private float _minSlideSpeed = .2f;
         private Vector3 _slideDirection;
@@ -117,6 +125,8 @@ namespace StarterAssets
         [Header("Jumping & Falling")]
         [Tooltip("The height the player can jump")]
         [SerializeField] private float _jumpHeight = 1.2f;
+        [Tooltip("How strongly the player's input should affect movement while airbourne")]
+        [SerializeField] private float _inputStrength = .1f;
         [Tooltip("How slowly will our the horizontal speed decay while airborne")]
         [SerializeField] private float _airSpeedChangeRate = .1f;
         [Tooltip("The character uses its own gravity value. The engine default is -9.81f")]
@@ -124,11 +134,11 @@ namespace StarterAssets
         [Tooltip("Time required to pass before being able to jump again. Set to 0f to instantly jump again")]
         [SerializeField] private float _jumpTimeout = 0.1f;
         [Tooltip("If the jump timeout has completed")]
-        [SerializeField] private bool _jumpTimeoutCompleted = true;
+        private bool _jumpTimeoutCompleted = true;
         [Tooltip("Time required to pass before entering the fall state. Useful for walking down stairs or across uneven terrain")]
         [SerializeField] private float _fallTimeout = 0.15f;
         [Tooltip("If the character has been falling for long enough to be considered No Longer Grounded")]
-        [SerializeField] private bool _fallTimeoutCompleted = false;
+        private bool _fallTimeoutCompleted = false;
         private float _jumpTimeoutDelta;
         private float _fallTimeoutDelta;
         private float _verticalVelocity;
@@ -138,7 +148,9 @@ namespace StarterAssets
         [SerializeField] private float _heavyLandingMinVelocity = 9f;
         [SerializeField] private float _nastyLandingMinVelocity = 15f;
         private bool _ignoreNextLandingSound = false;
-        private Vector3 _jumpAssistForce;
+        private Vector3 _airbourneDirection;
+        private float _jumpAssistSpeed;
+        private bool _jumped = false;
 
         [Space(10)]
         [Tooltip("If the character is physically touching the ground or not at this instance. " +
@@ -330,7 +342,8 @@ namespace StarterAssets
 				{
 					_fallTimeoutCompleted = false;
 					_logicallyGrounded = true;
-                    _jumpAssistForce = Vector3.zero; //clear the jump assist force, if one is active
+                    _jumpAssistSpeed = 0;  //clear the jump assist speed, if one is active
+                    _jumped = false;
 
                     OnLand?.Invoke(_landing);
                 }
@@ -406,14 +419,10 @@ namespace StarterAssets
             if (_isCrouched)
             {
                 //detect if uncrouch is possible
-                Vector3 playerMiddle = transform.position + Vector3.up * (_originalPlayerHeight / 2 + 0.01f);
-                Vector3 castSize = new Vector3((_controller.radius + _crouchCastTweak ) / 2, (_originalPlayerHeight) / 2, (_controller.radius + _crouchCastTweak) / 2);
-                Collider[] detectedColliders = Physics.OverlapBox(playerMiddle, castSize, transform.rotation, _groundLayers);
+                Collider[] detectedColliders = Physics.OverlapCapsule(_playerCapsuleBottom.position, _playerCapsuleTop.position, .5f, _groundLayers);
 
                 if (detectedColliders.Length > 0)
-                {
                     _isUncrouchAvailable = false;
-                }
                    
                 else _isUncrouchAvailable = true;
 
@@ -502,9 +511,17 @@ namespace StarterAssets
                 OnRunExit?.Invoke();
             }
 
+            //Clear any velocity utils
+            _controller.SimpleMove(Vector3.zero);
+            _controller.enabled = false;
+
             //reset jump
+            _jumped = false;
+            _jumpAssistSpeed = 0;
             _jumpTimeoutCompleted = false;
             _jumpTimeoutDelta = _jumpTimeout;
+            _verticalVelocity = 0;
+            UpdateLandingSound();
         }
         private void InitBaseClimbStates()
         {
@@ -519,13 +536,6 @@ namespace StarterAssets
             _transitionComplete = false;
             _midwayPointReached = false;
 
-            //Clear any velocity utils
-            _controller.SimpleMove(Vector3.zero);
-            _controller.enabled = false;
-            
-            //Reset the Jump utilities
-            _verticalVelocity = 0;
-            UpdateLandingSound();
         }
 
 
@@ -866,9 +876,10 @@ namespace StarterAssets
 
                             // the square root of H * -2 * G = how much velocity needed to reach desired height
                             _verticalVelocity = Mathf.Sqrt(_jumpHeight * -2f * _gravity);
-                            
 
-                            _jumpAssistForce = transform.TransformDirection(Vector3.forward) * _wallJumpDistance;
+                            _airbourneDirection = transform.TransformDirection(Vector3.forward);
+                            _jumpAssistSpeed = _wallJumpStrength;
+                            _jumped = true;
 
                             //signal the jump
                             OnJump?.Invoke();
@@ -961,56 +972,67 @@ namespace StarterAssets
         }
 		private void ApplyHorizontalMovement()
 		{
+            // Calculate the player's current total speed
+            float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
+
+            //apply any assists
+            if (_jumpAssistSpeed > 0)
+                currentHorizontalSpeed += _jumpAssistSpeed;
+
+            float speedOffset = 0.1f;
+
             // set target speed based on sprint/crouch/standing state
             float targetSpeed = CalculateTargetSpeed();
 
             // note: Vector2's == operator uses approximation so is not floating point error prone, and is cheaper than magnitude
             // cancel the target speed if no directional input is detected
-            if (_input.move == Vector2.zero) 
+            if (_input.move == Vector2.zero)
                 targetSpeed = 0.0f;
 
-            // a reference to the players current horizontal velocity
-            float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
-
-            float speedOffset = 0.1f;
             float inputMagnitude = _input.analogMovement ? _input.move.magnitude : 1f;
 
-            // accelerate or decelerate to target speed
-            if ((currentHorizontalSpeed < targetSpeed - speedOffset || currentHorizontalSpeed > targetSpeed + speedOffset))
+
+
+            // decelerate if sliding
+            if (_isSliding)
             {
-                //use the slide speed change rate if sliding
-                if (_isSliding)
-                {
-                    // creates curved result rather than a linear one giving a more organic speed change
-                    // note T in Lerp is clamped, so we don't need to clamp our speed
+                //use the regular slide speed change rate if above the rapidReduction threshold
+                if (currentHorizontalSpeed >= _rapidSlideReductionThreshold)
                     _speed = Mathf.Lerp(currentHorizontalSpeed, 0, Time.deltaTime * _slideSpeedChangeRate);
 
-                    // round speed to 3 decimal places
-                    _speed = Mathf.Round(_speed * 1000f) / 1000f;
-                }
-
-                //use the air speed change rate if not grounded
-                if (!_logicallyGrounded)
-                {
-                    // creates curved result rather than a linear one giving a more organic speed change
-                    // note T in Lerp is clamped, so we don't need to clamp our speed
-                    _speed = Mathf.Lerp(currentHorizontalSpeed, 0, Time.deltaTime * _airSpeedChangeRate);
-
-                    // round speed to 3 decimal places
-                    _speed = Mathf.Round(_speed * 1000f) / 1000f;
-                }
-
-                //otherwise use the general speed change rate
+                //use the larger slide speed change rate if below the threshold
                 else
-                {
-                    // creates curved result rather than a linear one giving a more organic speed change
-                    // note T in Lerp is clamped, so we don't need to clamp our speed
-                    _speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed * inputMagnitude, Time.deltaTime * _speedChangeRate);
+                    _speed = Mathf.Lerp(currentHorizontalSpeed, 0, Time.deltaTime * _harshSlideSpeedChangeRate);
 
-                    // round speed to 3 decimal places
-                    _speed = Mathf.Round(_speed * 1000f) / 1000f;
-                }
-                
+                // round speed to 3 decimal places
+                _speed = Mathf.Round(_speed * 1000f) / 1000f;
+            }
+
+
+            //decelerate if airbourne
+            else if (!_logicallyGrounded)
+            {
+                //update the airbourne direction, in the case we fell off something (not jumped)
+                if (!_jumped)
+                    _airbourneDirection = new Vector3(_controller.velocity.x, 0, _controller.velocity.z).normalized;
+
+
+                _speed = Mathf.Lerp(currentHorizontalSpeed, 0, Time.deltaTime * _airSpeedChangeRate);
+
+                // round speed to 3 decimal places
+                _speed = Mathf.Round(_speed * 1000f) / 1000f;
+            }
+
+            else if ((currentHorizontalSpeed < targetSpeed - speedOffset || currentHorizontalSpeed > targetSpeed + speedOffset))
+            {
+
+                // creates curved result rather than a linear one giving a more organic speed change
+                // note T in Lerp is clamped, so we don't need to clamp our speed
+                _speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed * inputMagnitude, Time.deltaTime * _speedChangeRate);
+
+                // round speed to 3 decimal places
+                _speed = Mathf.Round(_speed * 1000f) / 1000f;
+
             }
             else
             {
@@ -1043,6 +1065,9 @@ namespace StarterAssets
 
                     // the square root of H * -2 * G = how much velocity needed to reach desired height
                     _verticalVelocity = Mathf.Sqrt(_jumpHeight * -2f * _gravity);
+
+                    //our horizontal velocity will determine the jump's direction
+                    _airbourneDirection = new Vector3(_controller.velocity.x,0,_controller.velocity.z).normalized;
 
                     //signal the jump
                     OnJump?.Invoke();
@@ -1092,11 +1117,19 @@ namespace StarterAssets
             {
                 if (_isSliding)
                     _controller.Move(_slideDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
-                else
+
+                /*
+                else if (!_logicallyGrounded || _jumped)
                 {
-                    Vector3 combinedHorizontal = ((_moveDirection.normalized * _speed) + _jumpAssistForce) * Time.deltaTime;
-                    _controller.Move(combinedHorizontal + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
-                }
+                    //Change the movement direction by the influence of the player's input
+                    Vector3 compositeDirection = (_airbourneDirection.normalized  + _moveDirection.normalized * _inputStrength).normalized;
+
+                    //apply the speed + the input tweaks to both commit to the jump direction while also providing a small directional control
+                    _controller.Move( compositeDirection * _speed * Time.deltaTime  + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+                } */
+                    
+                else
+                    _controller.Move(_moveDirection.normalized * _speed * Time.deltaTime + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
                     
 
                 
@@ -1175,15 +1208,11 @@ namespace StarterAssets
             if (_controller != null && _crouchGizmo != null)
             {
                 if (_isUncrouchAvailable)
-                    _crouchGizmo.SetColor(_successColor);
-                else _crouchGizmo.SetColor(_missColor);
+                    Gizmos.color = _successColor;
+                else Gizmos.color = _missColor;
 
-
-                Vector3 playerMiddle = transform.position + Vector3.up * _originalPlayerHeight / 2;
-                Vector3 castSize = new Vector3((_controller.radius + _crouchCastTweak), _originalPlayerHeight, (_controller.radius + _crouchCastTweak));
-                //Gizmos.DrawWireCube(playerMiddle, castSize *2);
-                _crouchGizmo.SetSize(castSize);
-                _crouchGizmo.SetPosition(playerMiddle);
+                Gizmos.DrawWireSphere(_playerCapsuleBottom.position, .5f);
+                Gizmos.DrawWireSphere(_playerCapsuleTop.position, .5f);
                 
 
             }

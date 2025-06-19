@@ -4665,6 +4665,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 55919ac34a26952479f3fc91f777b2fa, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _playerCapsuleTop: {fileID: 374206617}
+  _playerCapsuleBottom: {fileID: 142295535}
   _movementState: 0
   _moveSpeed: 4
   _sprintSpeed: 6
@@ -4691,7 +4693,7 @@ MonoBehaviour:
   _peekDuration: 0.33
   _peekOffset: 1.25
   _wallHangClimbSpeed: 0.5
-  _detectedClimbingPoints: []
+  _wallJumpStrength: 1
   _cameraHeightTransitionSpeed: 2
   _isCrouched: 0
   _crouchHeight: 1
@@ -4699,12 +4701,17 @@ MonoBehaviour:
   _isUncrouchAvailable: 1
   _crouchCastTweak: 0.5
   _crouchGizmo: {fileID: 1687412103}
+  _isSliding: 0
+  _slideSpeedChangeRate: 1
+  _rapidSlideReductionThreshold: 0.5
+  _harshSlideSpeedChangeRate: 2
+  _minSlideSpeed: 0.2
   _jumpHeight: 1.2
+  _inputStrength: 0.05
+  _airSpeedChangeRate: 0.1
   _gravity: -15
   _jumpTimeout: 0.2
-  _jumpTimeoutCompleted: 1
   _fallTimeout: 0.15
-  _fallTimeoutCompleted: 0
   _landing: 3
   _moderateLandingMinVelocity: 5
   _heavyLandingMinVelocity: 9
