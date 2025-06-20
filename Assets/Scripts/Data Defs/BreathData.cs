@@ -16,6 +16,7 @@ public enum BreathType{
     landModerate,
     landHeavy,
     landNasty,
+    gruntLight,
     gruntModerate,
     gruntHeavy
 
@@ -44,6 +45,7 @@ public class BreathData : ScriptableObject
     [SerializeField] private List<AudioClip> _femaleLandModerateBreaths = new();
     [SerializeField] private List<AudioClip> _femaleLandHeavyBreaths = new();
     [SerializeField] private List<AudioClip> _femaleLandNastyBreaths = new();
+    [SerializeField] private List<AudioClip> _femaleLightGrunt = new();
     [SerializeField] private List<AudioClip> _femaleModerateGrunt = new();
     [SerializeField] private List<AudioClip> _femaleHeavyGrunt = new();
 
@@ -109,7 +111,10 @@ public class BreathData : ScriptableObject
 
                 case BreathType.landNasty:
                     return RandomUtils<AudioClip>.GetRandomElement(_femaleLandNastyBreaths);
-                    
+
+
+                case BreathType.gruntLight:
+                    return RandomUtils<AudioClip>.GetRandomElement(_femaleLightGrunt);
 
                 case BreathType.gruntModerate:
                     return RandomUtils<AudioClip>.GetRandomElement(_femaleModerateGrunt);

@@ -1045,6 +1045,134 @@ ReflectionProbe:
   m_UseOcclusionCulling: 1
   m_Importance: 1
   m_CustomBakedTexture: {fileID: 0}
+--- !u!1 &556445882
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 556445883}
+  - component: {fileID: 556445884}
+  m_Layer: 7
+  m_Name: Sliding AudioSource
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &556445883
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 556445882}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3893294199639930361}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!82 &556445884
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 556445882}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 8300000, guid: 636c3269606efc74da2ee4e1343b89ad, type: 3}
+  m_PlayOnAwake: 0
+  m_Volume: 0.851
+  m_Pitch: 1
+  Loop: 1
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &598438238
 GameObject:
   m_ObjectHideFlags: 0
@@ -4285,9 +4413,12 @@ MonoBehaviour:
   _currentTickProgress: 0
   _currentFloorType: 0
   _footstepData: {fileID: 11400000, guid: b98c5e4140bfdae45a0cca3716fb7dda, type: 2}
+  _slideAudioSource: {fileID: 556445884}
   _footstepsEnabled: 1
   _originalFootstepVolume: 1
   _crouchedVolume: 0.5
+  _slideFadeInRate: 5
+  _slideFadeOutRate: 3
 --- !u!82 &1937750231128854920
 AudioSource:
   m_ObjectHideFlags: 0
@@ -4624,6 +4755,7 @@ Transform:
   - {fileID: 1687412104}
   - {fileID: 776871280}
   - {fileID: 2254075148441306735}
+  - {fileID: 556445883}
   - {fileID: 106129269}
   - {fileID: 3055624215887834185}
   m_Father: {fileID: 0}
@@ -4644,7 +4776,6 @@ GameObject:
   - component: {fileID: 4416926083347132239}
   - component: {fileID: 135756641613574978}
   - component: {fileID: 135756641613574987}
-  - component: {fileID: 5885216829670671796}
   - component: {fileID: 5885216829670671797}
   m_Layer: 7
   m_Name: PlayerCapsule
@@ -4693,12 +4824,14 @@ MonoBehaviour:
   _peekDuration: 0.33
   _peekOffset: 1.25
   _wallHangClimbSpeed: 0.5
-  _wallJumpStrength: 1
-  _cameraHeightTransitionSpeed: 2
+  _crouchCamTransitionSpeed: 2
+  _slideCamTransitionSpeed: 3
+  _standCamTransitionSpeed: 2
   _isCrouched: 0
   _crouchHeight: 1
   _isCrouchAvailable: 1
-  _isUncrouchAvailable: 1
+  _isSlideAvailable: 1
+  _isStandupAvailable: 1
   _crouchCastTweak: 0.5
   _crouchGizmo: {fileID: 1687412103}
   _isSliding: 0
@@ -4707,7 +4840,6 @@ MonoBehaviour:
   _harshSlideSpeedChangeRate: 2
   _minSlideSpeed: 0.2
   _jumpHeight: 1.2
-  _inputStrength: 0.05
   _airSpeedChangeRate: 0.1
   _gravity: -15
   _jumpTimeout: 0.2
@@ -4909,25 +5041,6 @@ MonoBehaviour:
     m_Bits: 0
   canPush: 0
   strength: 1.1
---- !u!114 &5885216829670671796
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4416926083347132227}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b43298ac87b04e1429072c7e8180c4cd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _charController: {fileID: 4416926083347132233}
-  _currentClimbState: 0
-  _endPoint: {x: 0, y: 0, z: 0}
-  _minimumTransitionSpeed: 2
-  _transitionSpeed: 0
-  _totalDistanceToEndPoint: 0
-  _currentDistanceTraversed: 0
 --- !u!114 &5885216829670671797
 MonoBehaviour:
   m_ObjectHideFlags: 0

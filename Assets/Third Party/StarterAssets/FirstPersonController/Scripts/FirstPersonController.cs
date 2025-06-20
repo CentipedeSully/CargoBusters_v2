@@ -97,18 +97,20 @@ namespace StarterAssets
         [SerializeField] private float _wallHangClimbSpeed = 1;
         private List<Vector3> _detectedClimbingPoints = new();
         private List<Vector3> _tempClimbPointsList = new();
-        [SerializeField] private float _wallJumpStrength = 1;
 
 
 
         [Header("Crouching & Sliding")]
-        [SerializeField] private float _cameraHeightTransitionSpeed = 2.0f;
+        [SerializeField] private float _crouchCamTransitionSpeed = 2.0f;
+        [SerializeField] private float _slideCamTransitionSpeed = 3.0f;
+        [SerializeField] private float _standCamTransitionSpeed = 2.0f;
         [SerializeField] private bool _isCrouched = false;
         private bool _isCrouchTransitioning = false;
         private float _originalPlayerHeight;
         [SerializeField] private float _crouchHeight = 1;
         [SerializeField] private bool _isCrouchAvailable = true;
-        [SerializeField] private bool _isUncrouchAvailable = true;
+        [SerializeField] private bool _isSlideAvailable = true;
+        [SerializeField] private bool _isStandupAvailable = true;
         [SerializeField] private float _crouchCastTweak;
         [SerializeField] private DrawRectGizmo _crouchGizmo;
         [SerializeField] private bool _isSliding = false;
@@ -125,8 +127,6 @@ namespace StarterAssets
         [Header("Jumping & Falling")]
         [Tooltip("The height the player can jump")]
         [SerializeField] private float _jumpHeight = 1.2f;
-        [Tooltip("How strongly the player's input should affect movement while airbourne")]
-        [SerializeField] private float _inputStrength = .1f;
         [Tooltip("How slowly will our the horizontal speed decay while airborne")]
         [SerializeField] private float _airSpeedChangeRate = .1f;
         [Tooltip("The character uses its own gravity value. The engine default is -9.81f")]
@@ -148,9 +148,6 @@ namespace StarterAssets
         [SerializeField] private float _heavyLandingMinVelocity = 9f;
         [SerializeField] private float _nastyLandingMinVelocity = 15f;
         private bool _ignoreNextLandingSound = false;
-        private Vector3 _airbourneDirection;
-        private float _jumpAssistSpeed;
-        private bool _jumped = false;
 
         [Space(10)]
         [Tooltip("If the character is physically touching the ground or not at this instance. " +
@@ -323,7 +320,7 @@ namespace StarterAssets
                 UpdateGroundedStates();
                 UpdateSprintState();
                 UpdateLandingSound();
-                Crouch();
+                CrouchAndSlide();
                 UpdateCameraHeight();
                 EnterClimb();
             }
@@ -342,8 +339,6 @@ namespace StarterAssets
 				{
 					_fallTimeoutCompleted = false;
 					_logicallyGrounded = true;
-                    _jumpAssistSpeed = 0;  //clear the jump assist speed, if one is active
-                    _jumped = false;
 
                     OnLand?.Invoke(_landing);
                 }
@@ -413,18 +408,18 @@ namespace StarterAssets
 
             else _landing = FootSoundType.landEasy;
         }
-        private void Crouch()
+        private void CrouchAndSlide()
         {
-            //first, update the crouch states
-            if (_isCrouched)
+            //first, check if we can stand
+            if (_isCrouched || _isSliding)
             {
-                //detect if uncrouch is possible
+                //detect if standing is possible
                 Collider[] detectedColliders = Physics.OverlapCapsule(_playerCapsuleBottom.position, _playerCapsuleTop.position, .5f, _groundLayers);
 
                 if (detectedColliders.Length > 0)
-                    _isUncrouchAvailable = false;
+                    _isStandupAvailable = false;
                    
-                else _isUncrouchAvailable = true;
+                else _isStandupAvailable = true;
 
             }
 
@@ -433,29 +428,54 @@ namespace StarterAssets
             // check if we need to leave the slide state
             if (_isSliding)
             {
-                //leave the slide state if any of the following are met:
+                //leave the slide state (if we can stand) if the following are met:
                 // - we left the ground
-                // - our velocity reached our "too slow" threshold
-                // - we've somehow left the crouch state without leaving the slide state
-                if (!_logicallyGrounded || horizontalVelocity.magnitude < _minSlideSpeed || !_isCrouched )
+                // - the mechanic is enabled
+                // - player isn't pressing [crouch btn]  
+                if (_isStandupAvailable && ( !_logicallyGrounded || !_input.crouch || !_isSlideAvailable))
+                {
+                    _isSliding = false;
+
+                    //resize collider
+                    _controller.height = _originalPlayerHeight;
+                    _controller.center = Vector3.up * 0.93f;
+
+                    OnSlideExit?.Invoke();
+                }
+
+                // - Enter the crouch state if our slide velocity is too slow
+                else if (horizontalVelocity.magnitude < _minSlideSpeed)
                 {
                     _isSliding = false;
                     OnSlideExit?.Invoke();
-                }   
+
+                    //go back to crouching if the mechanic isn't disabled
+                    if (_isCrouchAvailable)
+                    {
+                        _isCrouched = true;
+                        OnCrouchEnter?.Invoke();
+                    }
+                    
+                }
             }
 
             //check if we need to ENTER the slide state
-            else if (!_isSliding && _input.crouch && _logicallyGrounded && horizontalVelocity.magnitude > _moveSpeed)
+            else if ( (!_isSliding && !_isCrouched) && _input.crouch && _logicallyGrounded && horizontalVelocity.magnitude > _moveSpeed && _isSlideAvailable)
             {
                 _isSliding = true;
                 _slideDirection = transform.TransformDirection(Vector3.forward);
+
+                //resize collider
+                _controller.height = _crouchHeight;
+                _controller.center = Vector3.up * _crouchHeight / 2;
+
                 OnSlideEnter?.Invoke();
             } 
 
 
-            //now determine the core crouch state
-            //if we arent crouched && crouch isn't disabled && [crouch btn]
-            if (!_isCrouched && _isCrouchAvailable && _input.crouch)
+            
+            //check if we need to enter a crouch
+            if (!_isCrouched && !_isSliding && _isCrouchAvailable && _input.crouch)
             {
                 _isCrouched = true;
                 
@@ -465,19 +485,10 @@ namespace StarterAssets
 
                 OnCrouchEnter?.Invoke(); //Sliding is a substate of Crouch. Enter crouch BEFORE Enter Slide
 
-                Vector3 nonVerticalVelocity = new Vector3(_controller.velocity.x, 0, _controller.velocity.z);
-
-                //enter a slide if our velocity is beyond the walk threshold
-                if (nonVerticalVelocity.magnitude > _moveSpeed)
-                {
-                    _isSliding = true;
-                    _slideDirection = transform.TransformDirection(Vector3.forward);
-                    OnSlideEnter?.Invoke();
-                }
             }
 
-            //else if we ARE crouched && we have space to raise && [released crouch btn OR lost the crouch ability]
-            else if (_isCrouched && (!_input.crouch || !_isCrouchAvailable) && _isUncrouchAvailable) //make sure we're actually able to uncrouch, too
+            //check if we need to LEAVE the crouch
+            else if (_isCrouched && _isStandupAvailable && (!_input.crouch || !_isCrouchAvailable))
             {
                 _isCrouched = false;
 
@@ -485,17 +496,7 @@ namespace StarterAssets
                 _controller.height = _originalPlayerHeight;
                 _controller.center = Vector3.up * 0.93f;
 
-
-                //exit our slide if we're sliding
-                if (_isSliding)
-                {
-                    _isSliding = false;
-                    OnSlideExit?.Invoke();
-                }
-
-                OnCrouchExit?.Invoke(); //Sliding is a substate of Crouch. Exit crouch AFTER exiting Slide
-
-
+                OnCrouchExit?.Invoke();
             }
 
         }
@@ -511,13 +512,30 @@ namespace StarterAssets
                 OnRunExit?.Invoke();
             }
 
+            if (_isCrouched )
+            {
+                //resize collider
+                _controller.height = _originalPlayerHeight;
+                _controller.center = Vector3.up * 0.93f;
+
+                OnCrouchExit?.Invoke();
+            }
+            else if (_isSliding)
+            {
+                _isSliding = false;
+
+                //resize collider
+                _controller.height = _originalPlayerHeight;
+                _controller.center = Vector3.up * 0.93f;
+
+                OnSlideExit?.Invoke();
+            }
+
             //Clear any velocity utils
             _controller.SimpleMove(Vector3.zero);
             _controller.enabled = false;
 
             //reset jump
-            _jumped = false;
-            _jumpAssistSpeed = 0;
             _jumpTimeoutCompleted = false;
             _jumpTimeoutDelta = _jumpTimeout;
             _verticalVelocity = 0;
@@ -877,9 +895,6 @@ namespace StarterAssets
                             // the square root of H * -2 * G = how much velocity needed to reach desired height
                             _verticalVelocity = Mathf.Sqrt(_jumpHeight * -2f * _gravity);
 
-                            _airbourneDirection = transform.TransformDirection(Vector3.forward);
-                            _jumpAssistSpeed = _wallJumpStrength;
-                            _jumped = true;
 
                             //signal the jump
                             OnJump?.Invoke();
@@ -975,10 +990,6 @@ namespace StarterAssets
             // Calculate the player's current total speed
             float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
 
-            //apply any assists
-            if (_jumpAssistSpeed > 0)
-                currentHorizontalSpeed += _jumpAssistSpeed;
-
             float speedOffset = 0.1f;
 
             // set target speed based on sprint/crouch/standing state
@@ -1003,21 +1014,6 @@ namespace StarterAssets
                 //use the larger slide speed change rate if below the threshold
                 else
                     _speed = Mathf.Lerp(currentHorizontalSpeed, 0, Time.deltaTime * _harshSlideSpeedChangeRate);
-
-                // round speed to 3 decimal places
-                _speed = Mathf.Round(_speed * 1000f) / 1000f;
-            }
-
-
-            //decelerate if airbourne
-            else if (!_logicallyGrounded)
-            {
-                //update the airbourne direction, in the case we fell off something (not jumped)
-                if (!_jumped)
-                    _airbourneDirection = new Vector3(_controller.velocity.x, 0, _controller.velocity.z).normalized;
-
-
-                _speed = Mathf.Lerp(currentHorizontalSpeed, 0, Time.deltaTime * _airSpeedChangeRate);
 
                 // round speed to 3 decimal places
                 _speed = Mathf.Round(_speed * 1000f) / 1000f;
@@ -1049,7 +1045,7 @@ namespace StarterAssets
                 return _sprintSpeed;
 
             else if (_isCrouched || _isCrouchTransitioning)
-                return _cameraHeightTransitionSpeed;
+                return _crouchCamTransitionSpeed;
 
             else return _moveSpeed;
         }
@@ -1065,9 +1061,6 @@ namespace StarterAssets
 
                     // the square root of H * -2 * G = how much velocity needed to reach desired height
                     _verticalVelocity = Mathf.Sqrt(_jumpHeight * -2f * _gravity);
-
-                    //our horizontal velocity will determine the jump's direction
-                    _airbourneDirection = new Vector3(_controller.velocity.x,0,_controller.velocity.z).normalized;
 
                     //signal the jump
                     OnJump?.Invoke();
@@ -1117,16 +1110,6 @@ namespace StarterAssets
             {
                 if (_isSliding)
                     _controller.Move(_slideDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
-
-                /*
-                else if (!_logicallyGrounded || _jumped)
-                {
-                    //Change the movement direction by the influence of the player's input
-                    Vector3 compositeDirection = (_airbourneDirection.normalized  + _moveDirection.normalized * _inputStrength).normalized;
-
-                    //apply the speed + the input tweaks to both commit to the jump direction while also providing a small directional control
-                    _controller.Move( compositeDirection * _speed * Time.deltaTime  + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
-                } */
                     
                 else
                     _controller.Move(_moveDirection.normalized * _speed * Time.deltaTime + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
@@ -1175,7 +1158,20 @@ namespace StarterAssets
             if (_isCrouched & _camRootParent.localPosition.y  > _crouchHeight )
             {
 
-                Vector3 newHeight = _camRootParent.transform.localPosition + Vector3.down * (Mathf.Round(Time.deltaTime * 100)/100) *_cameraHeightTransitionSpeed;
+                Vector3 newHeight = _camRootParent.transform.localPosition + Vector3.down * (Mathf.Round(Time.deltaTime * 100)/100) *_crouchCamTransitionSpeed;
+
+                if (Mathf.Round(newHeight.y * 100) < Mathf.Round(_crouchHeight * 100))
+                    _camRootParent.localPosition = new Vector3(_camRootParent.transform.localPosition.x, _crouchHeight, _camRootParent.transform.localPosition.z);
+                else
+                    _camRootParent.localPosition = newHeight;
+
+            }
+
+            //is character sliding but not at the slide height?
+            if (_isSliding & _camRootParent.localPosition.y > _crouchHeight)
+            {
+
+                Vector3 newHeight = _camRootParent.transform.localPosition + Vector3.down * (Mathf.Round(Time.deltaTime * 100) / 100) * _slideCamTransitionSpeed;
 
                 if (Mathf.Round(newHeight.y * 100) < Mathf.Round(_crouchHeight * 100))
                     _camRootParent.localPosition = new Vector3(_camRootParent.transform.localPosition.x, _crouchHeight, _camRootParent.transform.localPosition.z);
@@ -1185,9 +1181,9 @@ namespace StarterAssets
             }
 
             //revert the cam to the player's original height
-            else if (!_isCrouched && _camRootParent.localPosition.y < _originalPlayerHeight)
+            else if (!_isCrouched && !_isSliding && _camRootParent.localPosition.y < _originalPlayerHeight)
             {
-                Vector3 newHeight = _camRootParent.transform.localPosition + Vector3.up * (Mathf.Round(Time.deltaTime * 100) / 100) * _cameraHeightTransitionSpeed;
+                Vector3 newHeight = _camRootParent.transform.localPosition + Vector3.up * (Mathf.Round(Time.deltaTime * 100) / 100) * _standCamTransitionSpeed;
 
                 if (Mathf.Round(newHeight.y * 100) > Mathf.Round(_originalPlayerHeight * 100))
                     _camRootParent.localPosition = new Vector3(_camRootParent.transform.localPosition.x, _originalPlayerHeight, _camRootParent.transform.localPosition.z);
@@ -1207,7 +1203,7 @@ namespace StarterAssets
         {
             if (_controller != null && _crouchGizmo != null)
             {
-                if (_isUncrouchAvailable)
+                if (_isStandupAvailable)
                     Gizmos.color = _successColor;
                 else Gizmos.color = _missColor;
 

@@ -34,6 +34,8 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 6da235e2573048249bcbe608f984ff48, type: 3}
   - {fileID: 8300000, guid: fdc05ea2699023143ba7e93533cc5a0b, type: 3}
   - {fileID: 8300000, guid: f26cf9ded47cf0140957490a16f85acc, type: 3}
+  _generalSlidings:
+  - {fileID: 8300000, guid: 636c3269606efc74da2ee4e1343b89ad, type: 3}
   _generalEasyLandsteps:
   - {fileID: 8300000, guid: 9e68ea1ebd76aa44c8cfa5beb9850830, type: 3}
   - {fileID: 8300000, guid: 1deb201b8bf8f89479323a74e421150b, type: 3}

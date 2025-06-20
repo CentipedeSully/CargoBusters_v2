@@ -13,12 +13,18 @@ public class Footstepper : MonoBehaviour
 
     [SerializeField] private FloorType _currentFloorType = FloorType.unset;
     [SerializeField] private FootstepData _footstepData;
+    [SerializeField] private AudioSource _slideAudioSource;
     private AudioSource _footAudioSource;
     [SerializeField] private bool _footstepsEnabled = true;
     [SerializeField] private float _originalFootstepVolume;
     [SerializeField] private float _crouchedVolume = .4f;
     private float _targetTickDistance = 0;
     private bool _isClimbing = false;
+    private bool _isSliding = false;
+    private float _slideAudioSpeed = 1;
+    [SerializeField] private float _slideFadeInRate = 1;
+    [SerializeField] private float _slideFadeOutRate = 1;
+    private float _currentSlideVolume = 0;
 
     public delegate void FootstepEvent();
     public event FootstepEvent OnFootstep;
@@ -44,6 +50,9 @@ public class Footstepper : MonoBehaviour
 
         _firstPersonController.OnWallHangEntered += EnterClimb;
         _firstPersonController.OnWallHangExited += ExitClimb;
+
+        _firstPersonController.OnSlideEnter += EnterSlide;
+        _firstPersonController.OnSlideExit += ExitSlide;
     }
 
     private void OnDisable()
@@ -57,15 +66,21 @@ public class Footstepper : MonoBehaviour
 
         _firstPersonController.OnWallHangEntered -= EnterClimb;
         _firstPersonController.OnWallHangExited -= ExitClimb;
+
+        _firstPersonController.OnSlideEnter -= EnterSlide;
+        _firstPersonController.OnSlideExit -= ExitSlide;
     }
 
     private void Update()
     {
-        if (_firstPersonController != null && _footstepsEnabled && !_isClimbing)
+        if (_firstPersonController != null && _footstepsEnabled && !_isClimbing && !_isSliding)
         {
             ManageFootstepVolume();
             IncrementTick(_firstPersonController.GetSpeed() * Time.deltaTime);
         }
+
+        ManageSlideVolume();
+        
             
     }
 
@@ -106,6 +121,29 @@ public class Footstepper : MonoBehaviour
         }
     }
 
+    private void ManageSlideVolume()
+    {
+        if (_slideAudioSource != null)
+        {
+            if (!_isSliding && _currentSlideVolume > 0)
+            {
+                //clamp to zero if calculations dip below zero
+                _currentSlideVolume = Mathf.Max(0, _slideFadeOutRate * Time.deltaTime - _currentSlideVolume);
+                _slideAudioSource.volume = _currentSlideVolume;
+
+                if (_currentSlideVolume == 0)
+                    _slideAudioSource.Stop();
+            }
+
+            if (_isSliding && _currentSlideVolume < 1)
+            {
+                //clamp to 1 if calculations reach above 1
+                _currentSlideVolume = Mathf.Min(1, _currentSlideVolume + _slideFadeInRate * Time.deltaTime);
+                _slideAudioSource.volume = _currentSlideVolume;
+            }
+        }
+    }
+
     private void SetFootSound(FootSoundType newType)
     {
         if (_footAudioSource != null && _footstepData != null)
@@ -141,6 +179,18 @@ public class Footstepper : MonoBehaviour
         _isClimbing = false;
     }
 
+    private void EnterSlide()
+    {
+        _isSliding = true;
+
+        if (_slideAudioSource.isPlaying == false)
+            _slideAudioSource.Play();
+    }
+
+    private void ExitSlide()
+    {
+        _isSliding = false;
+    }
 
     private void TriggerJumpSideEffects()
     {

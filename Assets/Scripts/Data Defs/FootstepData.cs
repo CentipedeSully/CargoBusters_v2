@@ -16,6 +16,7 @@ public enum FootSoundType
     unset,
     walk,
     run,
+    slide,
     landEasy,
     landModerate,
     landHeavy,
@@ -40,6 +41,7 @@ public class FootstepData : ScriptableObject
     [Header("Footstep Source AudioClips")]
     [SerializeField] private List<AudioClip> _generalWalksteps = new();
     [SerializeField] private List<AudioClip> _generalRunsteps = new();
+    [SerializeField] private List<AudioClip> _generalSlidings = new();
     [SerializeField] private List<AudioClip> _generalEasyLandsteps = new();
     [SerializeField] private List<AudioClip> _generalModerateLandsteps = new();
     [SerializeField] private List<AudioClip> _generalHeavyLandsteps = new();
@@ -87,6 +89,9 @@ public class FootstepData : ScriptableObject
 
                 case FootSoundType.run:
                     return RandomUtils<AudioClip>.GetRandomElement(_generalRunsteps);
+
+                case FootSoundType.slide:
+                    return RandomUtils<AudioClip>.GetRandomElement(_generalSlidings);
 
                 case FootSoundType.landEasy:
                     return RandomUtils<AudioClip>.GetRandomElement(_generalEasyLandsteps);

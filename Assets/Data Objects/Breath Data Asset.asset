@@ -46,6 +46,9 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 2cd5b70844a5d2149a988bbf32fa4ab2, type: 3}
   - {fileID: 8300000, guid: c67a0647d28fe644990c65f353bd43ba, type: 3}
   - {fileID: 8300000, guid: 6dded875e32740a47a91b75ceed815f7, type: 3}
+  _femaleLightGrunt:
+  - {fileID: 8300000, guid: b2b4b803e540a5941b85835225e4123a, type: 3}
+  - {fileID: 8300000, guid: f300f6f637051434a99e353b8ee75b79, type: 3}
   _femaleModerateGrunt:
   - {fileID: 8300000, guid: 8b4c99dde5c09674aae678124df03393, type: 3}
   - {fileID: 8300000, guid: cf9804f0275e4d54ebe46901668dd356, type: 3}
